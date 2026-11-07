@@ -39,7 +39,7 @@ export function updateScript(ctx: ScriptContext): string {
 :local newCa ($fc . "_1")
 
 # 1) fetch version
-/file remove [find where name="hs-ver.txt"]
+:do { /file remove [find where name="hs-ver.txt"] } on-error={ }
 :local ok true
 :do {
     /tool fetch url=($base . "/version.txt") user=$fuser password=$fpass check-certificate=$cc dst-path="hs-ver.txt"
@@ -50,16 +50,16 @@ export function updateScript(ctx: ScriptContext): string {
 }
 :delay 1s
 :local ver [/file get [find where name="hs-ver.txt"] contents]
-/file remove [find where name="hs-ver.txt"]
+:do { /file remove [find where name="hs-ver.txt"] } on-error={ }
 :if ($ver = [/system script get [find where name=$sname] comment]) do={
     :log info "hs-cert: up to date"
     :return
 }
 
 # 2) download material
-/certificate remove [find where name~"^hs-new-"]
-/file remove [find where name=$fc]
-/file remove [find where name=$pk]
+:do { /certificate remove [find where name~"^hs-new-"] } on-error={ }
+:do { /file remove [find where name=$fc] } on-error={ }
+:do { /file remove [find where name=$pk] } on-error={ }
 :set ok true
 :do {
     /tool fetch url=($base . "/fullchain.pem") user=$fuser password=$fpass check-certificate=$cc dst-path=$fc
@@ -78,8 +78,8 @@ export function updateScript(ctx: ScriptContext): string {
 :if ([:len [/certificate find where name=$newCert]] = 0) do={
     :log error "hs-cert: import failed"
     :do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=0&step=import") user=$fuser password=$fpass check-certificate=$cc output=none } on-error={ }
-    /file remove [find where name=$fc]
-    /file remove [find where name=$pk]
+    :do { /file remove [find where name=$fc] } on-error={ }
+    :do { /file remove [find where name=$pk] } on-error={ }
     :error "hs-cert: import failed"
 }
 
@@ -93,8 +93,8 @@ export function updateScript(ctx: ScriptContext): string {
 /ip hotspot profile set [find where name=$profile] ssl-certificate="hs-live"
 
 # 5) finalize
-/file remove [find where name=$fc]
-/file remove [find where name=$pk]
+:do { /file remove [find where name=$fc] } on-error={ }
+:do { /file remove [find where name=$pk] } on-error={ }
 /system script set [find where name=$sname] comment=$ver
 :do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=1&step=bind") user=$fuser password=$fpass check-certificate=$cc output=none } on-error={ :log warning "hs-cert: ack failed (non-fatal)" }
 :log info ("hs-cert: updated to version " . $ver)
