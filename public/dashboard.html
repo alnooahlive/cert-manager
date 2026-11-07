@@ -156,6 +156,10 @@ function populateCustomerSelect(){
   sel.value=cur;
 }
 
+function statusButton(r){
+  if(r.status!=='active') return '<button class="btn sm primary" onclick="setStatus(\''+r.id+'\',\'active\')">تفعيل</button>';
+  return '<button class="btn sm ghost" onclick="setStatus(\''+r.id+'\',\'disabled\')">إيقاف</button>';
+}
 function renderTree(){
   const q=(document.getElementById('q').value||'').toLowerCase();
   const tree=document.getElementById('tree');
@@ -194,7 +198,7 @@ function renderTree(){
         <div class="tree-actions">
           <button class="btn sm ghost" onclick="genScript('${r.id}')">سكربت (تلقائي)</button>
           <button class="btn sm ghost" onclick="viewAgent('${r.id}')">وكيل</button>
-          ${r.status!=='active'?'<button class="btn sm primary" onclick="setStatus(''+r.id+'','active')">تفعيل</button>':'<button class="btn sm ghost" onclick="setStatus(''+r.id+'','disabled')">إيقاف</button>'}
+          ${statusButton(r)}
           <button class="btn sm ${r.renewal_enabled?'ghost':'primary'}" onclick="toggleRenewal('${r.id}',${!r.renewal_enabled})">${r.renewal_enabled?'إيقاف التجديد':'تفعيل التجديد'}</button>
           <button class="btn sm danger" onclick="delRouter('${r.id}')">حذف</button>
         </div>
@@ -232,7 +236,7 @@ function renderTree(){
         <div class="tree-actions">
           <button class="btn sm ghost" onclick="genScript('${r.id}')">سكربت (تلقائي)</button>
           <button class="btn sm ghost" onclick="viewAgent('${r.id}')">وكيل</button>
-          ${r.status!=='active'?'<button class="btn sm primary" onclick="setStatus(''+r.id+'','active')">تفعيل</button>':'<button class="btn sm ghost" onclick="setStatus(''+r.id+'','disabled')">إيقاف</button>'}
+          ${statusButton(r)}
           <button class="btn sm ${r.renewal_enabled?'ghost':'primary'}" onclick="toggleRenewal('${r.id}',${!r.renewal_enabled})">${r.renewal_enabled?'إيقاف التجديد':'تفعيل التجديد'}</button>
           <button class="btn sm danger" onclick="delRouter('${r.id}')">حذف</button>
         </div>
