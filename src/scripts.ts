@@ -99,9 +99,9 @@ export function bootstrapScript(ctx: ScriptContext): string {
 # test: /tool fetch url="https://${ctx.agent_host}/" check-certificate=yes output=none
 ` : '';
   return `# ===== hs-cert bootstrap | router=${ctx.router_name} | ROS ${ctx.ros_major} | template v${ctx.template_version || '1'} =====
-# 0) backup
-/export file=before-hs-cert
-/system backup save name=before-hs-cert
+# 0) backup (disabled)
+# /export file=before-hs-cert
+# /system backup save name=before-hs-cert
 
 # 1) verify clock/ntp
 :put [/system clock print]
