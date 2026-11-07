@@ -1,4 +1,4 @@
-// Mikrotik RouterOS script generator
+// Mikrotik RouterOS script generator (auto-detect ROS 6/7)
 export interface ScriptContext {
   router_name: string;
   ros_major: number;
@@ -17,15 +17,21 @@ function esc(s: string): string {
 }
 
 export function updateScript(ctx: ScriptContext): string {
-  const cc = ctx.ros_major === 6 ? 'no' : 'yes';
   const base = `https://${ctx.agent_host}/agent/v1/${ctx.url_token}`;
-  return `# ===== hs-cert-update | router=${ctx.router_name} | ROS ${ctx.ros_major} | template v${ctx.template_version || '1'} =====
+  return `# ===== hs-cert-update | router=${ctx.router_name} | ROS auto | template v${ctx.template_version || '1'} =====
 :local sname "hs-cert-update"
 :local profile "${esc(ctx.hotspot_profile)}"
 :local base "${esc(base)}"
 :local fuser "${esc(ctx.agent_user)}"
 :local fpass "${esc(ctx.agent_secret)}"
 :local ackb ($base . "/ack")
+
+# detect ROS major at runtime
+:local rosVer [/system resource get version]
+:local rosMajor 6
+:if ([:find $rosVer "7."] = 0) do={ :set rosMajor 7 }
+:local cc "no"
+:if ($rosMajor = 7) do={ :set cc "yes" }
 
 :local fc "hs-new-fullchain.pem"
 :local pk "hs-new-privkey.pem"
@@ -36,7 +42,7 @@ export function updateScript(ctx: ScriptContext): string {
 /file remove [find where name="hs-ver.txt"]
 :local ok true
 :do {
-    /tool fetch url=($base . "/version.txt") user=$fuser password=$fpass check-certificate=${cc} dst-path="hs-ver.txt"
+    /tool fetch url=($base . "/version.txt") user=$fuser password=$fpass check-certificate=$cc dst-path="hs-ver.txt"
 } on-error={ :set ok false }
 :if (!$ok) do={
     :log error "hs-cert: version fetch failed"
@@ -55,12 +61,12 @@ export function updateScript(ctx: ScriptContext): string {
 /file remove [find where name=$pk]
 :set ok true
 :do {
-    /tool fetch url=($base . "/fullchain.pem") user=$fuser password=$fpass check-certificate=${cc} dst-path=$fc
-    /tool fetch url=($base . "/privkey.pem") user=$fuser password=$fpass check-certificate=${cc} dst-path=$pk
+    /tool fetch url=($base . "/fullchain.pem") user=$fuser password=$fpass check-certificate=$cc dst-path=$fc
+    /tool fetch url=($base . "/privkey.pem") user=$fuser password=$fpass check-certificate=$cc dst-path=$pk
 } on-error={ :set ok false }
 :if (!$ok) do={
     :log error "hs-cert: download failed"
-    :do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=0&step=download") user=$fuser password=$fpass check-certificate=${cc} output=none } on-error={ }
+    :do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=0&step=download") user=$fuser password=$fpass check-certificate=$cc output=none } on-error={ }
     :error "hs-cert: download failed"
 }
 
@@ -70,13 +76,15 @@ export function updateScript(ctx: ScriptContext): string {
 :delay 3s
 :if ([:len [/certificate find where name=$newCert]] = 0) do={
     :log error "hs-cert: import failed"
-    :do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=0&step=import") user=$fuser password=$fpass check-certificate=${cc} output=none } on-error={ }
+    :do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=0&step=import") user=$fuser password=$fpass check-certificate=$cc output=none } on-error={ }
     /file remove [find where name=$fc]
     /file remove [find where name=$pk]
     :error "hs-cert: import failed"
 }
 
 # 4) bind
+/ip hotspot profile set [find where name=$profile] dns-name=${ctx.hotspot_dns_name} login-by=https,http-chap
+:if ($rosMajor = 6) do={ /ip hotspot profile set [find where name=$profile] https-redirect=no }
 /ip hotspot profile set [find where name=$profile] ssl-certificate=$newCert
 /certificate remove [find where name~"^hs-live"]
 /certificate set [find where name=$newCert] name="hs-live"
@@ -87,35 +95,35 @@ export function updateScript(ctx: ScriptContext): string {
 /file remove [find where name=$fc]
 /file remove [find where name=$pk]
 /system script set [find where name=$sname] comment=$ver
-:do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=1&step=bind") user=$fuser password=$fpass check-certificate=${cc} output=none } on-error={ }
+:do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=1&step=bind") user=$fuser password=$fpass check-certificate=$cc output=none } on-error={ }
 :log info ("hs-cert: updated to version " . $ver)
 `;
 }
 
 export function bootstrapScript(ctx: ScriptContext): string {
-  const cc = ctx.ros_major === 6 ? 'no' : 'yes';
-  const v6note = ctx.ros_major === 6 ? `# RouterOS 6: ensure ISRG root CA imported if check-certificate=yes fails
-# /certificate import file-name=isrg-root-x1.pem passphrase=""
-# test: /tool fetch url="https://${ctx.agent_host}/" check-certificate=yes output=none
-` : '';
-  return `# ===== hs-cert bootstrap | router=${ctx.router_name} | ROS ${ctx.ros_major} | template v${ctx.template_version || '1'} =====
+  return `# ===== hs-cert bootstrap (AUTO) | router=${ctx.router_name} | template v${ctx.template_version || '1'} =====
 # 0) backup (disabled)
 # /export file=before-hs-cert
 # /system backup save name=before-hs-cert
 
+# detect ROS major
+:local rosVer [/system resource get version]
+:local rosMajor 6
+:if ([:find $rosVer "7."] = 0) do={ :set rosMajor 7 }
+:put ("Detected ROS major: " . $rosMajor)
+
 # 1) verify clock/ntp
 :put [/system clock print]
 :put [/system ntp client print]
-${ctx.ros_major === 7 ? ':put [/system device-mode print]' : ''}
+:if ($rosMajor = 7) do={ :put [/system device-mode print] }
 
 # 2) DNS static (idempotent)
 :do { /ip dns static add name=${ctx.hotspot_dns_name} address=${ctx.hotspot_local_ip} type=A comment="hs-cert" } on-error={ }
 
 # 3) hotspot profile
 /ip hotspot profile set [find where name=${ctx.hotspot_profile}] dns-name=${ctx.hotspot_dns_name} login-by=https,http-chap
-${ctx.ros_major === 7 ? '' : '/ip hotspot profile set [find where name=' + ctx.hotspot_profile + '] https-redirect=no'}
+:if ($rosMajor = 6) do={ /ip hotspot profile set [find where name=${ctx.hotspot_profile}] https-redirect=no }
 
-${v6note}
 # 4) create update script
 /system script remove [find where name=hs-cert-update]
 /system script add name=hs-cert-update policy=read,write,test,policy,sensitive comment="0" source={${updateScript(ctx).replace(/^/gm, '    ')}}
