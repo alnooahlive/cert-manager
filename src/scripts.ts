@@ -107,8 +107,8 @@ export function bootstrapScript(ctx: ScriptContext): string {
 :put [/system ntp client print]
 ${ctx.ros_major === 7 ? ':put [/system device-mode print]' : ''}
 
-# 2) DNS static
-/ip dns static add name=${ctx.hotspot_dns_name} address=${ctx.hotspot_local_ip} type=A comment="hs-cert"
+# 2) DNS static (idempotent)
+:do { /ip dns static add name=${ctx.hotspot_dns_name} address=${ctx.hotspot_local_ip} type=A comment="hs-cert" } on-error={ }
 
 # 3) hotspot profile
 /ip hotspot profile set [find where name=${ctx.hotspot_profile}] dns-name=${ctx.hotspot_dns_name} login-by=https,http-chap

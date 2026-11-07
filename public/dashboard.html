@@ -205,6 +205,7 @@
     <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
       <select id="scriptRos" style="width:120px" onchange="loadScripts()"><option value="7">ROS 7</option><option value="6">ROS 6</option></select>
       <button class="btn primary sm" onclick="copyScript()">📋 نسخ</button>
+      <button class="btn ghost sm" onclick="verifyScript()">✅ تحقق</button>
       <button class="btn ghost sm" onclick="closeScriptModal()">إغلاق</button>
     </div>
     <textarea id="scriptText" readonly></textarea>
@@ -344,12 +345,14 @@ async function addRouter(){
     const res=await api('/api/routers',{method:'POST',body:JSON.stringify(body)});
     routers.unshift(res.router);
     renderRouters();
-    msg.textContent='تمت الإضافة بنجاح ✅'; msg.className='msg ok';
+    msg.textContent='تمت الإضافة بنجاح ✅ — جاري إنشاء السكربت...'; msg.className='msg ok';
     toast('تمت الإضافة بنجاح');
     const info=document.getElementById('agentInfo'); info.style.display='block';
     document.getElementById('agentBox').textContent=`URL Token: ${res.agent.url_token}\nAgent User: ${res.agent.agent_user}\nAgent Secret: ${res.agent.agent_secret}\nBase: https://${location.hostname}/agent/v1/${res.agent.url_token}/`;
     ['network_name','network_number','hotspot_local_ip','hotspot_dns_name'].forEach(id=>document.getElementById(id).value='');
     updateDnsHint();
+    // auto-open script modal
+    setTimeout(()=>genScript(res.router.id, 7), 300);
   }catch(e){ msg.textContent='خطأ: '+e.message; msg.className='msg err'; toast('خطأ: '+e.message,'err'); }
 }
 
@@ -385,6 +388,18 @@ async function copyScript(){
   try{ await navigator.clipboard.writeText(document.getElementById('scriptText').value); document.getElementById('scriptMsg').textContent='✅ تم النسخ'; document.getElementById('scriptMsg').className='msg ok'; toast('تم النسخ'); }catch(e){ document.getElementById('scriptMsg').textContent='فشل النسخ، انسخ يدوياً'; document.getElementById('scriptMsg').className='msg err'; }
 }
 function closeScriptModal(){ document.getElementById('scriptModal').style.display='none'; }
+async function verifyScript(){
+  const msg=document.getElementById('scriptMsg');
+  msg.textContent='جاري التحقق...'; msg.className='msg';
+  try{
+    const c=await api('/api/routers/'+currentScriptId+'/agent');
+    const b64=btoa(c.agent_user+':'+c.agent_secret);
+    const r=await fetch('/agent/v1/'+c.url_token+'/version.txt',{headers:{Authorization:'Basic '+b64}});
+    const t=await r.text();
+    if(r.ok){ msg.textContent='✅ Agent reachable. Current version: '+t; msg.className='msg ok'; toast('التحقق ناجح'); }
+    else { msg.textContent='⚠ Agent returned '+r.status; msg.className='msg err'; toast('فشل التحقق','err'); }
+  }catch(e){ msg.textContent='خطأ: '+e.message; msg.className='msg err'; toast('خطأ: '+e.message,'err'); }
+}
 
 function updateDnsHint(){
   const v=document.getElementById('hotspot_dns_name').value.trim();
