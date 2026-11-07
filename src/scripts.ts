@@ -87,7 +87,7 @@ export function updateScript(ctx: ScriptContext): string {
 /ip hotspot profile set [find where name=$profile] dns-name=${ctx.hotspot_dns_name} login-by=https,http-chap
 :if ($rosMajor = 6) do={ /ip hotspot profile set [find where name=$profile] https-redirect=no }
 /ip hotspot profile set [find where name=$profile] ssl-certificate=$newCert
-/certificate remove [find where name~"^hs-live"]
+:do { /certificate remove [find where name~"^hs-live"] } on-error={ }
 /certificate set [find where name=$newCert] name="hs-live"
 /certificate set [find where name=$newCa] name="hs-live-ca"
 /ip hotspot profile set [find where name=$profile] ssl-certificate="hs-live"
