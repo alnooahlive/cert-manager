@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Cert Manager</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Roboto,Arial;margin:0;background:#0f172a;color:#e2e8f0}
+    .wrap{max-width:960px;margin:40px auto;padding:0 20px}
+    h1{font-size:28px;margin:0 0 8px}
+    .card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:20px;margin:16px 0}
+    input,button{padding:8px 12px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#e2e8f0;margin:4px}
+    button{background:#3b82f6;border:none;cursor:pointer}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    pre{background:#0b1220;padding:12px;border-radius:8px;overflow:auto;max-height:300px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Cert Manager</h1>
+    <p class="card">Mikrotik Hotspot SSL certificate manager. API: <code>/api</code>, health: <code>/health</code>.</p>
+    <div class="card">
+      <h3>Login</h3>
+      <div class="row">
+        <input id="email" placeholder="email" />
+        <input id="password" type="password" placeholder="password" />
+        <button onclick="login()">Login</button>
+        <button onclick="register()">Register</button>
+      </div>
+      <pre id="out"></pre>
+    </div>
+    <div class="card">
+      <h3>Routers</h3>
+      <button onclick="loadRouters()">Load</button>
+      <pre id="routers"></pre>
+    </div>
+    <div class="card">
+      <h3>Certificates</h3>
+      <button onclick="loadCerts()">Load</button>
+      <pre id="certs"></pre>
+    </div>
+  </div>
+  <script>
+    async function api(path, opts){ const r=await fetch(path, {...(opts||{}), credentials:'include', headers:{'Content-Type':'application/json', ...(opts?.headers||{})}}); const t=await r.text(); try{return JSON.parse(t)}catch{return t} }
+    async function login(){ const r=await api('/api/auth/login',{method:'POST',body:JSON.stringify({email:email.value,password:password.value})}); out.textContent=JSON.stringify(r,null,2) }
+    async function register(){ const r=await api('/api/auth/register',{method:'POST',body:JSON.stringify({email:email.value,password:password.value})}); out.textContent=JSON.stringify(r,null,2) }
+    async function loadRouters(){ const r=await api('/api/routers'); routers.textContent=JSON.stringify(r,null,2) }
+    async function loadCerts(){ const r=await api('/api/certificates'); certs.textContent=JSON.stringify(r,null,2) }
+  </script>
+</body>
+</html>
