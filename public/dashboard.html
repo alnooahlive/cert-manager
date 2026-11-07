@@ -69,6 +69,18 @@
   @keyframes spin{to{transform:rotate(360deg)}}
   .dns-hint{font-size:12px;color:var(--muted);margin-top:4px}
   .dns-hint span{color:#93c5fd;font-weight:600}
+  .tree-node{border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden;background:rgba(13,21,38,.5)}
+  .tree-head{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;user-select:none;transition:background .18s}
+  .tree-head:hover{background:rgba(79,140,255,.06)}
+  .tree-head .arrow{transition:transform .2s;font-size:12px;color:var(--muted)}
+  .tree-head.open .arrow{transform:rotate(90deg)}
+  .tree-body{display:none;padding:10px 14px 14px;border-top:1px solid var(--border);background:rgba(8,14,26,.4)}
+  .tree-body.open{display:block}
+  .tree-child{margin:8px 0;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:rgba(19,31,56,.6)}
+  .tree-grand{margin:6px 0 6px 0;padding:8px 10px;border:1px dashed var(--border);border-radius:8px;background:rgba(8,14,26,.5);font-size:12px}
+  .tree-title{font-weight:700;font-size:14px}
+  .tree-meta{color:var(--muted);font-size:12px;margin-top:2px}
+  .tree-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 </style>
 </head>
 <body>
@@ -83,115 +95,12 @@
 <div class="layout">
   <!-- Left: forms -->
   <div>
-    <div class="card">
-      <h2>👤 إضافة عميل (مالك)</h2>
-      <label>اسم العميل</label>
-      <input id="c_name" placeholder="اسم العميل" />
-      <div class="form-grid">
-        <div>
-          <label>الهاتف</label>
-          <input id="c_phone" placeholder="+964..." />
-        </div>
-        <div>
-          <label>البريد</label>
-          <input id="c_email" placeholder="email@example.com" />
-        </div>
-      </div>
-      <label>عدد الروترات (قابل للتعديل لاحقاً)</label>
-      <input id="c_count" type="number" value="1" min="1" />
-      <button class="btn primary" style="width:100%;margin-top:16px" onclick="addCustomer()">حفظ العميل</button>
-      <div class="msg" id="cmsg"></div>
+            <div class="card">
+      <h2>🌳 العملاء → الموجهات → الشهادات</h2>
+      <div class="search"><input id="q" placeholder="بحث بالاسم أو IP أو النطاق..." oninput="renderTree()" /></div>
+      <div id="tree"></div>
+      <div class="empty" id="treeEmpty" style="display:none"><div class="icon">📡</div>لا توجد بيانات</div>
     </div>
-
-    <div class="card">
-      <h2>➕ إضافة موجه (Router)</h2>
-      <label>العميل (المالك)</label>
-      <select id="customer_id"><option value="">-- بدون عميل --</option></select>
-      <label>اسم الشبكة</label>
-      <input id="network_name" placeholder="مثال: cafenet" />
-      <div class="form-grid">
-        <div>
-          <label>رقم الشبكة</label>
-          <input id="network_number" placeholder="مثال: 1" />
-        </div>
-        <div>
-          <label>IP المحلي للموجه</label>
-          <input id="hotspot_local_ip" placeholder="192.168.88.1" />
-        </div>
-      </div>
-      <label>النطاق الفرعي (prefix فقط)</label>
-      <input id="hotspot_dns_name" placeholder="cafe" oninput="updateDnsHint()" />
-      <div class="dns-hint">النتيجة: <span id="dnsHint"></span></div>
-      <label>ملف Hotspot Profile</label>
-      <input id="hotspot_profile" placeholder="hsprof1" />
-      <label>مدة الاشتراك (أشهر)</label>
-      <input id="subscription_months" type="number" value="1" min="1" />
-      <button class="btn primary" style="width:100%;margin-top:16px" onclick="addRouter()">حفظ وإضافة تلقائياً</button>
-      <div class="msg" id="msg"></div>
-      <div id="agentInfo" style="display:none">
-        <label>بيانات الوكيل (Agent):</label>
-        <div class="agent-box" id="agentBox"></div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>🌐 النطاق الرئيسي (Main Domain)</h2>
-      <label>النطاق الرئيسي</label>
-      <input id="main_domain" placeholder="alnooah.pro" />
-      <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px">
-        <input id="apply_all" type="checkbox" style="width:auto;margin:0" /> تطبيق على جميع الشبكات (موجودة + جديدة)
-      </label>
-      <button class="btn primary" style="width:100%;margin-top:12px" onclick="saveMainDomain()">حفظ</button>
-      <div class="msg" id="dmsg"></div>
-    </div>
-  </div>
-
-  <!-- Right: lists -->
-  <div>
-    <div class="stats">
-      <div class="stat"><div class="n" id="stTotal">0</div><div class="l">إجمالي الموجهات</div></div>
-      <div class="stat"><div class="n" id="stActive">0</div><div class="l">نشطة</div></div>
-      <div class="stat"><div class="n" id="stCerts">0</div><div class="l">شهادات صادرة</div></div>
-      <div class="stat"><div class="n" id="stCust">0</div><div class="l">العملاء</div></div>
-    </div>
-
-    <div class="card">
-      <h2>👥 العملاء (عدد الروترات)</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>اسم العميل</th><th>الهاتف</th><th>عدد الروترات (قابل للتعديل)</th><th>روترات فعلية</th><th>إجراءات</th></tr></thead>
-          <tbody id="custBody"></tbody>
-        </table>
-        <div class="empty" id="custEmpty" style="display:none"><div class="icon">👥</div>لا توجد عملاء</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>📋 الموجهات</h2>
-      <div class="search"><input id="q" placeholder="بحث بالاسم أو IP أو النطاق..." oninput="renderRouters()" /></div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr>
-            <th>اسم الشبكة</th><th>رقم</th><th>IP</th><th>النطاق</th><th>العميل</th><th>ROS</th><th>الحالة</th><th>التجديد</th><th>إجراءات</th>
-          </tr></thead>
-          <tbody id="tbody"></tbody>
-        </table>
-        <div class="empty" id="empty" style="display:none"><div class="icon">📡</div>لا توجد بيانات</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <h2>📜 الشهادات</h2>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>الموجه</th><th>الإصدار</th><th>الحالة</th><th>تنتهي في</th><th>المصدر</th><th>التجديد</th><th>إجراءات</th></tr></thead>
-          <tbody id="certsBody"></tbody>
-        </table>
-        <div class="empty" id="certsEmpty" style="display:none"><div class="icon">📜</div>لا توجد شهادات</div>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- Script modal -->
 <div class="modal-back" id="scriptModal">
@@ -234,7 +143,7 @@ async function load(){
     customers=await api('/api/customers');
     routers=await api('/api/routers');
     document.getElementById('user').textContent='admin@alnooah.pro';
-    renderCustomers(); renderRouters(); loadCertsCount(); loadCertsTable();
+    renderTree(); loadCertsCount(); loadCertsTable();
     populateCustomerSelect();
   }catch(e){ if(e.message.includes('401')||e.message.includes('unauthorized')){localStorage.removeItem('token');location.href='/login';} }
 }
@@ -247,71 +156,127 @@ function populateCustomerSelect(){
   sel.value=cur;
 }
 
-function renderCustomers(){
-  const tb=document.getElementById('custBody'); tb.innerHTML='';
-  if(customers.length===0){ document.getElementById('custEmpty').style.display='block'; }
-  else { document.getElementById('custEmpty').style.display='none'; }
+function renderTree(){
+  const q=(document.getElementById('q').value||'').toLowerCase();
+  const tree=document.getElementById('tree');
+  tree.innerHTML='';
+  if(customers.length===0 && routers.length===0){ document.getElementById('treeEmpty').style.display='block'; return; }
+  document.getElementById('treeEmpty').style.display='none';
+  // group routers by customer; unassigned routers at end
+  const assigned=new Set();
   customers.forEach(c=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td><strong>${esc(c.name)}</strong></td>
-      <td>${esc(c.phone||'-')}</td>
-      <td><div class="cust-count"><input type="number" min="1" value="${c.router_count}" id="cnt-${c.id}" /> <button class="btn sm ghost" onclick="saveCount('${c.id}')">حفظ</button></div></td>
-      <td>${esc(c.actual_routers||0)}</td>
-      <td><button class="btn sm danger" onclick="delCustomer('${c.id}')">حذف</button></td>`;
-    tb.appendChild(tr);
+    let custRouters=routers.filter(r=>r.customer_id===c.id);
+    if(q){
+      custRouters=custRouters.filter(r=> (r.network_name||r.router_name||'').toLowerCase().includes(q) || (r.hotspot_local_ip||'').toLowerCase().includes(q) || (r.hotspot_dns_name||'').toLowerCase().includes(q));
+      if(!c.name.toLowerCase().includes(q) && custRouters.length===0) return;
+    }
+    const node=document.createElement('div');
+    node.className='tree-node';
+    const head=document.createElement('div');
+    head.className='tree-head';
+    head.innerHTML=`<span class="arrow">▶</span><span style="font-size:18px">👤</span><div style="flex:1"><div class="tree-title">${esc(c.name)}</div><div class="tree-meta">هاتف: ${esc(c.phone||'-')} · عدد الروترات: ${c.router_count} (فعلي: ${custRouters.length})</div></div><div class="tree-actions"><button class="btn sm ghost" onclick="event.stopPropagation();editCount('${c.id}')">تعديل العدد</button><button class="btn sm danger" onclick="event.stopPropagation();delCustomer('${c.id}')">حذف</button></div>`;
+    const body=document.createElement('div');
+    body.className='tree-body';
+    head.onclick=()=>{ head.classList.toggle('open'); body.classList.toggle('open'); };
+    // routers
+    custRouters.forEach(r=>{
+      const rdiv=document.createElement('div');
+      rdiv.className='tree-child';
+      const certs=routers? (window._certs||[]).filter(x=>x.router_id===r.id) : [];
+      rdiv.innerHTML=`
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:16px">📡</span>
+          <strong>${esc(r.network_name||r.router_name||'-')}</strong>
+          <span class="badge ${r.status==='active'?'active':'pending'}">${esc(r.status)}</span>
+          <span style="color:var(--muted);font-size:12px">${esc(r.hotspot_local_ip)} · ${esc(r.hotspot_dns_name)}</span>
+        </div>
+        <div class="tree-meta">رقم: ${esc(r.network_number||'-')} · ROS: ${esc(r.ros_major||'-')} · تجديد: ${r.renewal_enabled?'مفعّل':'موقف'}</div>
+        <div class="tree-actions">
+          <button class="btn sm ghost" onclick="genScript('${r.id}')">سكربت (تلقائي)</button>
+          <button class="btn sm ghost" onclick="viewAgent('${r.id}')">وكيل</button>
+          ${r.status!=='active'?'<button class="btn sm primary" onclick="setStatus(''+r.id+'','active')">تفعيل</button>':'<button class="btn sm ghost" onclick="setStatus(''+r.id+'','disabled')">إيقاف</button>'}
+          <button class="btn sm ${r.renewal_enabled?'ghost':'primary'}" onclick="toggleRenewal('${r.id}',${!r.renewal_enabled})">${r.renewal_enabled?'إيقاف التجديد':'تفعيل التجديد'}</button>
+          <button class="btn sm danger" onclick="delRouter('${r.id}')">حذف</button>
+        </div>
+        <div id="certs-${r.id}" style="margin-top:8px"></div>`;
+      body.appendChild(rdiv);
+    });
+    if(custRouters.length===0){ const d=document.createElement('div'); d.className='tree-meta'; d.style.padding='8px'; d.textContent='لا توجد موجهات'; body.appendChild(d); }
+    node.appendChild(head); node.appendChild(body);
+    tree.appendChild(node);
+    assigned.add(c.id);
   });
-  document.getElementById('stCust').textContent=customers.length;
-}
-
-async function saveCount(id){
-  const input=document.getElementById('cnt-'+id);
-  try{ await api('/api/customers/'+id,{method:'PATCH',body:JSON.stringify({router_count:parseInt(input.value,10)})}); toast('تم حفظ العدد'); load(); }catch(e){ toast('خطأ: '+e.message,'err'); }
-}
-async function delCustomer(id){ if(!confirm('حذف العميل؟')) return; try{ await api('/api/customers/'+id,{method:'DELETE'}); toast('تم الحذف'); load(); }catch(e){ toast('خطأ: '+e.message,'err'); } }
-
-async function addCustomer(){
-  const msg=document.getElementById('cmsg'); msg.textContent=''; msg.className='msg';
-  const body={ name: document.getElementById('c_name').value.trim(), phone: document.getElementById('c_phone').value.trim(), email: document.getElementById('c_email').value.trim(), router_count: parseInt(document.getElementById('c_count').value,10)||1 };
-  if(!body.name){ msg.textContent='اسم العميل مطلوب'; msg.className='msg err'; return; }
-  try{ await api('/api/customers',{method:'POST',body:JSON.stringify(body)}); msg.textContent='تم حفظ العميل ✅'; msg.className='msg ok'; toast('تم حفظ العميل'); ['c_name','c_phone','c_email'].forEach(id=>document.getElementById(id).value=''); document.getElementById('c_count').value=1; load(); }catch(e){ msg.textContent='خطأ: '+e.message; msg.className='msg err'; }
-}
-
-function renderRouters(){
-  const q=document.getElementById('q').value.toLowerCase();
-  const filtered=routers.filter(r=> (r.network_name||r.router_name||'').toLowerCase().includes(q) || (r.hotspot_local_ip||'').toLowerCase().includes(q) || (r.hotspot_dns_name||'').toLowerCase().includes(q));
-  const tb=document.getElementById('tbody');
-  tb.innerHTML='';
-  if(filtered.length===0){ document.getElementById('empty').style.display='block'; }
-  else { document.getElementById('empty').style.display='none'; }
-  filtered.forEach(r=>{
-    const tr=document.createElement('tr');
-    const cust = customers.find(c=>c.id===r.customer_id);
-    tr.innerHTML=`
-      <td><strong>${esc(r.network_name||r.router_name||'-')}</strong></td>
-      <td>${esc(r.network_number||'-')}</td>
-      <td>${esc(r.hotspot_local_ip)}</td>
-      <td>${esc(r.hotspot_dns_name)}</td>
-      <td>${esc(cust?.name||'-')}</td>
-      <td><select onchange="setRos('${r.id}',this.value)" style="width:70px;padding:4px">
-        <option value="" ${!r.ros_major?'selected':''}>-</option>
-        <option value="6" ${r.ros_major==6?'selected':''}>6</option>
-        <option value="7" ${r.ros_major==7?'selected':''}>7</option>
-      </select></td>
-      <td><span class="badge ${r.status==='active'?'active':'pending'}">${esc(r.status)}</span></td>
-      <td><button class="btn sm ${r.renewal_enabled?'primary':'ghost'}" onclick="toggleRenewal('${r.id}',${!r.renewal_enabled})">${r.renewal_enabled?'مفعّل':'موقف'}</button></td>
-      <td><div class="row-actions">
-        ${r.status!=='active'
-          ? `<button class="btn sm primary" onclick="setStatus('${r.id}','active')">تفعيل</button>`
-          : `<button class="btn sm ghost" onclick="setStatus('${r.id}','disabled')">إيقاف</button>`}
-        <button class="btn sm danger" onclick="delRouter('${r.id}')">حذف</button>
-        <button class="btn sm ghost" onclick="genScript('${r.id}')">سكربت (تلقائي)</button>
-        <button class="btn sm ghost" onclick="viewAgent('${r.id}')">وكيل</button>
-      </div></td>`;
-    tb.appendChild(tr);
-  });
+  // unassigned routers
+  const unassigned=routers.filter(r=>!r.customer_id);
+  let filteredUn=unassigned;
+  if(q){ filteredUn=unassigned.filter(r=> (r.network_name||r.router_name||'').toLowerCase().includes(q) || (r.hotspot_local_ip||'').toLowerCase().includes(q) || (r.hotspot_dns_name||'').toLowerCase().includes(q)); }
+  if(filteredUn.length>0){
+    const node=document.createElement('div');
+    node.className='tree-node';
+    const head=document.createElement('div');
+    head.className='tree-head open';
+    head.innerHTML=`<span class="arrow" style="transform:rotate(90deg)">▶</span><span style="font-size:18px">📡</span><div style="flex:1"><div class="tree-title">موجهات بدون عميل</div><div class="tree-meta">${filteredUn.length} موجه</div></div>`;
+    const body=document.createElement('div');
+    body.className='tree-body open';
+    filteredUn.forEach(r=>{
+      const rdiv=document.createElement('div');
+      rdiv.className='tree-child';
+      rdiv.innerHTML=`
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span style="font-size:16px">📡</span>
+          <strong>${esc(r.network_name||r.router_name||'-')}</strong>
+          <span class="badge ${r.status==='active'?'active':'pending'}">${esc(r.status)}</span>
+          <span style="color:var(--muted);font-size:12px">${esc(r.hotspot_local_ip)} · ${esc(r.hotspot_dns_name)}</span>
+        </div>
+        <div class="tree-meta">رقم: ${esc(r.network_number||'-')} · ROS: ${esc(r.ros_major||'-')} · تجديد: ${r.renewal_enabled?'مفعّل':'موقف'}</div>
+        <div class="tree-actions">
+          <button class="btn sm ghost" onclick="genScript('${r.id}')">سكربت (تلقائي)</button>
+          <button class="btn sm ghost" onclick="viewAgent('${r.id}')">وكيل</button>
+          ${r.status!=='active'?'<button class="btn sm primary" onclick="setStatus(''+r.id+'','active')">تفعيل</button>':'<button class="btn sm ghost" onclick="setStatus(''+r.id+'','disabled')">إيقاف</button>'}
+          <button class="btn sm ${r.renewal_enabled?'ghost':'primary'}" onclick="toggleRenewal('${r.id}',${!r.renewal_enabled})">${r.renewal_enabled?'إيقاف التجديد':'تفعيل التجديد'}</button>
+          <button class="btn sm danger" onclick="delRouter('${r.id}')">حذف</button>
+        </div>
+        <div id="certs-${r.id}" style="margin-top:8px"></div>`;
+      body.appendChild(rdiv);
+    });
+    node.appendChild(head); node.appendChild(body);
+    tree.appendChild(node);
+  }
   document.getElementById('stTotal').textContent=routers.length;
   document.getElementById('stActive').textContent=routers.filter(r=>r.status==='active').length;
+  document.getElementById('stCust').textContent=customers.length;
+  // render certs into router sections
+  renderCertsIntoTree();
 }
+
+function editCount(id){
+  const c=customers.find(x=>x.id===id);
+  const v=prompt('عدد الروترات:', c?c.router_count:1);
+  if(v===null) return;
+  saveCountDirect(id, parseInt(v,10));
+}
+async function saveCountDirect(id,val){
+  try{ await api('/api/customers/'+id,{method:'PATCH',body:JSON.stringify({router_count:val})}); toast('تم حفظ العدد'); load(); }catch(e){ toast('خطأ: '+e.message,'err'); }
+}
+
+async function loadCertsIntoTree(){
+  try{
+    const c=await api('/api/certificates');
+    window._certs=c;
+    c.forEach(x=>{
+      const cont=document.getElementById('certs-'+x.router_id);
+      if(!cont) return;
+      const r=routers.find(rr=>rr.id===x.router_id);
+      const div=document.createElement('div');
+      div.className='tree-grand';
+      div.innerHTML=`📜 v${esc(x.version)} · ${esc(x.status)} · ${esc(x.not_after?new Date(x.not_after).toLocaleDateString():'-')} · ${esc(x.source)} <button class="btn sm ghost" style="margin-right:6px" onclick="toggleCertRenewal('${x.id}',${!x.renewal_enabled})">${x.renewal_enabled?'تجديد مفعّل':'تجديد موقف'}</button> ${x.status!=='revoked'?'<button class="btn sm ghost" onclick="revokeCert(\''+x.id+'\')">إيقاف</button>':''} <button class="btn sm danger" onclick="delCert('${x.id}')">حذف</button>`;
+      cont.appendChild(div);
+    });
+    document.getElementById('stCerts').textContent=c.filter(x=>x.status==='issued').length;
+  }catch{}
+}
+// alias
+function renderCertsTable(){ loadCertsIntoTree(); }
 
 async function setRos(id,val){
   try{ await api('/api/routers/'+id,{method:'PATCH',body:JSON.stringify({ros_major: val?parseInt(val,10):null})}); toast('تم تحديث الإصدار'); }catch(e){ toast('خطأ: '+e.message,'err'); }
