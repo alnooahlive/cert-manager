@@ -24,6 +24,7 @@ function checkAuth(req: any, cred: any) {
   if (u === cred.agent_user && p === cred.agent_secret) return true;
   // RouterOS sends user/password as query params sometimes
   if (req.query.fuser === cred.agent_user && req.query.fpass === cred.agent_secret) return true;
+  if (req.query.user === cred.agent_user && req.query.password === cred.agent_secret) return true;
   return false;
 }
 

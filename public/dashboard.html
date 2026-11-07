@@ -119,6 +119,16 @@
         <div class="empty" id="empty" style="display:none">لا توجد بيانات</div>
       </div>
     </div>
+    <div class="card" style="margin-top:20px">
+      <h2>📜 الشهادات</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>الموجه</th><th>الإصدار</th><th>الحالة</th><th>تنتهي في</th><th>المصدر</th></tr></thead>
+          <tbody id="certsBody"></tbody>
+        </table>
+        <div class="empty" id="certsEmpty" style="display:none">لا توجد شهادات</div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -138,11 +148,26 @@ async function load(){
     document.getElementById('user').textContent='admin@alnooah.pro';
     render();
     loadCertsCount();
+    loadCertsTable();
   }catch(e){ if(e.message.includes('401')||e.message.includes('unauthorized')){localStorage.removeItem('token');location.href='/login';} }
 }
 
 async function loadCertsCount(){
-  try{ const c=await api('/api/certificates'); document.getElementById('stCerts').textContent=c.length; }catch{}
+  try{ const c=await api('/api/certificates'); document.getElementById('stCerts').textContent=c.filter(x=>x.status==='issued').length; }catch{}
+}
+async function loadCertsTable(){
+  try{
+    const c=await api('/api/certificates');
+    const tb=document.getElementById('certsBody'); tb.innerHTML='';
+    if(c.length===0){ document.getElementById('certsEmpty').style.display='block'; return; }
+    document.getElementById('certsEmpty').style.display='none';
+    c.forEach(x=>{
+      const r=routers.find(rr=>rr.id===x.router_id);
+      const tr=document.createElement('tr');
+      tr.innerHTML=`<td>${esc(r?.network_name||r?.router_name||'-')}</td><td>${esc(x.version)}</td><td><span class="badge ${x.status==='issued'?'active':'pending'}">${esc(x.status)}</span></td><td>${esc(x.not_after?new Date(x.not_after).toLocaleDateString():'-')}</td><td>${esc(x.source)}</td>`;
+      tb.appendChild(tr);
+    });
+  }catch{}
 }
 
 function render(){
@@ -192,6 +217,7 @@ async function addRouter(){
     const res=await api('/api/routers',{method:'POST',body:JSON.stringify(body)});
     routers.unshift(res.router);
     render();
+    loadCertsTable();
     msg.textContent='تمت الإضافة بنجاح ✅'; msg.className='msg ok';
     const info=document.getElementById('agentInfo'); info.style.display='block';
     document.getElementById('agentBox').textContent=`URL Token: ${res.agent.url_token}\nAgent User: ${res.agent.agent_user}\nAgent Secret: ${res.agent.agent_secret}\nBase: https://${location.hostname}/agent/v1/${res.agent.url_token}/`;
