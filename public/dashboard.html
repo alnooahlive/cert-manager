@@ -17,9 +17,9 @@
   .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
   .btn.danger{background:var(--danger);color:#fff}
   .btn.sm{padding:6px 10px;font-size:12px}
-  .layout{display:grid;grid-template-columns:380px 1fr;gap:22px;padding:24px 28px;max-width:1500px;margin:0 auto}
+  .layout{display:grid;grid-template-columns:360px 1fr;gap:22px;padding:24px 28px;max-width:1500px;margin:0 auto}
   @media(max-width:1000px){.layout{grid-template-columns:1fr}}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:20px}
   .card h2{margin:0 0 16px;font-size:17px;display:flex;align-items:center;gap:8px}
   label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px;font-weight:600}
   input,select{width:100%;padding:11px 13px;border-radius:9px;border:1px solid var(--border);background:#0b1220;color:var(--text);font-size:14px}
@@ -44,12 +44,8 @@
   .row-actions{display:flex;gap:6px;flex-wrap:wrap}
   .cust-count{display:inline-flex;align-items:center;gap:6px}
   .cust-count input{width:60px;padding:4px 6px}
-  .modal-back{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;z-index:100}
-  .modal{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:460px}
-  .modal h3{margin:0 0 14px}
-  .tabs{display:flex;gap:8px;margin-bottom:16px}
-  .tab{padding:8px 14px;border-radius:8px;cursor:pointer;background:transparent;color:var(--muted);border:1px solid var(--border)}
-  .tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .search{margin-bottom:14px}
+  .search input{width:100%}
 </style>
 </head>
 <body>
@@ -64,21 +60,35 @@
 <div class="layout">
   <!-- Left: forms -->
   <div>
-    <div class="tabs">
-      <div class="tab active" onclick="showTab('router',this)">إضافة موجه</div>
-      <div class="tab" onclick="showTab('customer',this)">إضافة عميل</div>
+    <div class="card">
+      <h2>👤 إضافة عميل (مالك)</h2>
+      <label>اسم العميل</label>
+      <input id="c_name" placeholder="اسم العميل" />
+      <div class="form-grid">
+        <div>
+          <label>الهاتف</label>
+          <input id="c_phone" placeholder="+964..." />
+        </div>
+        <div>
+          <label>البريد</label>
+          <input id="c_email" placeholder="email@example.com" />
+        </div>
+      </div>
+      <label>عدد الروترات (قابل للتعديل لاحقاً)</label>
+      <input id="c_count" type="number" value="1" min="1" />
+      <button class="btn primary" style="width:100%;margin-top:16px" onclick="addCustomer()">حفظ العميل</button>
+      <div class="msg" id="cmsg"></div>
     </div>
 
-    <!-- Router form -->
-    <div class="card" id="tab-router">
-      <h2>➕ إضافة موجه / شهادة</h2>
-      <label>العميل (Customer)</label>
+    <div class="card">
+      <h2>➕ إضافة موجه (Router)</h2>
+      <label>العميل (المالك)</label>
       <select id="customer_id"><option value="">-- بدون عميل --</option></select>
-      <label>اسم الشبكة (Network Name)</label>
+      <label>اسم الشبكة</label>
       <input id="network_name" placeholder="مثال: cafenet" />
       <div class="form-grid">
         <div>
-          <label>رقم الشبكة (Network Number)</label>
+          <label>رقم الشبكة</label>
           <input id="network_number" placeholder="مثال: 1" />
         </div>
         <div>
@@ -90,16 +100,6 @@
       <input id="hotspot_dns_name" placeholder="hotspot.example.com" />
       <label>ملف Hotspot Profile</label>
       <input id="hotspot_profile" placeholder="hsprof1" />
-      <div class="form-grid">
-        <div>
-          <label>اسم مالك الشبكة</label>
-          <input id="owner_name" placeholder="اسم المالك" />
-        </div>
-        <div>
-          <label>هاتف مالك الشبكة</label>
-          <input id="owner_phone" placeholder="+964..." />
-        </div>
-      </div>
       <label>مدة الاشتراك (أشهر)</label>
       <input id="subscription_months" type="number" value="1" min="1" />
       <button class="btn primary" style="width:100%;margin-top:16px" onclick="addRouter()">حفظ وإضافة تلقائياً</button>
@@ -108,21 +108,6 @@
         <label>بيانات الوكيل (Agent):</label>
         <div class="agent-box" id="agentBox"></div>
       </div>
-    </div>
-
-    <!-- Customer form -->
-    <div class="card" id="tab-customer" style="display:none">
-      <h2>👤 إضافة عميل</h2>
-      <label>اسم العميل</label>
-      <input id="c_name" placeholder="اسم العميل" />
-      <label>الهاتف</label>
-      <input id="c_phone" placeholder="+964..." />
-      <label>البريد</label>
-      <input id="c_email" placeholder="email@example.com" />
-      <label>عدد الروترات (Routers count)</label>
-      <input id="c_count" type="number" value="1" min="1" />
-      <button class="btn primary" style="width:100%;margin-top:16px" onclick="addCustomer()">حفظ العميل</button>
-      <div class="msg" id="cmsg"></div>
     </div>
   </div>
 
@@ -136,7 +121,7 @@
     </div>
 
     <!-- Customers -->
-    <div class="card" style="margin-bottom:20px">
+    <div class="card">
       <h2>👥 العملاء (عدد الروترات)</h2>
       <div class="table-wrap">
         <table>
@@ -149,7 +134,7 @@
 
     <!-- Routers -->
     <div class="card">
-      <h2>📋 الموجهات / المشتركون</h2>
+      <h2>📋 الموجهات</h2>
       <div class="search"><input id="q" placeholder="بحث بالاسم أو IP أو النطاق..." oninput="renderRouters()" /></div>
       <div class="table-wrap">
         <table>
@@ -163,7 +148,7 @@
     </div>
 
     <!-- Certs -->
-    <div class="card" style="margin-top:20px">
+    <div class="card">
       <h2>📜 الشهادات</h2>
       <div class="table-wrap">
         <table>
@@ -184,13 +169,6 @@ let routers=[]; let customers=[];
 
 function logout(){ localStorage.removeItem('token'); location.href='/login'; }
 async function api(path,opts){ const r=await fetch(path,{...(opts||{}),headers:{...H,...(opts?.headers||{})}}); const t=await r.text(); let d; try{d=JSON.parse(t)}catch{d=t} if(!r.ok) throw new Error(d.error||r.statusText); return d; }
-
-function showTab(name,el){
-  document.getElementById('tab-router').style.display = name==='router'?'block':'none';
-  document.getElementById('tab-customer').style.display = name==='customer'?'block':'none';
-  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
-  el.classList.add('active');
-}
 
 async function load(){
   try{
@@ -218,7 +196,7 @@ function renderCustomers(){
     const tr=document.createElement('tr');
     tr.innerHTML=`<td><strong>${esc(c.name)}</strong></td>
       <td>${esc(c.phone||'-')}</td>
-      <td><div class="cust-count"><input type="number" min="1" value="${c.router_count}" onchange="updateCount('${c.id}',this.value)" /> <button class="btn sm ghost" onclick="saveCount('${c.id}',this)">حفظ</button></div></td>
+      <td><div class="cust-count"><input type="number" min="1" value="${c.router_count}" id="cnt-${c.id}" /> <button class="btn sm ghost" onclick="saveCount('${c.id}')">حفظ</button></div></td>
       <td>${esc(c.actual_routers||0)}</td>
       <td><button class="btn sm danger" onclick="delCustomer('${c.id}')">حذف</button></td>`;
     tb.appendChild(tr);
@@ -226,9 +204,8 @@ function renderCustomers(){
   document.getElementById('stCust').textContent=customers.length;
 }
 
-async function updateCount(id,val){ /* placeholder */ }
-async function saveCount(id,btn){
-  const input=btn.parentElement.querySelector('input');
+async function saveCount(id){
+  const input=document.getElementById('cnt-'+id);
   try{ await api('/api/customers/'+id,{method:'PATCH',body:JSON.stringify({router_count:parseInt(input.value,10)})}); load(); }catch(e){ alert('خطأ: '+e.message); }
 }
 async function delCustomer(id){ if(!confirm('حذف العميل؟')) return; try{ await api('/api/customers/'+id,{method:'DELETE'}); load(); }catch(e){ alert('خطأ: '+e.message); } }
@@ -242,7 +219,7 @@ async function addCustomer(){
 
 function renderRouters(){
   const q=document.getElementById('q').value.toLowerCase();
-  const filtered=routers.filter(r=> (r.network_name||r.router_name||'').toLowerCase().includes(q) || (r.hotspot_local_ip||'').toLowerCase().includes(q) || (r.hotspot_dns_name||'').toLowerCase().includes(q) || (r.customer_name||r.customer_name_full||'').toLowerCase().includes(q));
+  const filtered=routers.filter(r=> (r.network_name||r.router_name||'').toLowerCase().includes(q) || (r.hotspot_local_ip||'').toLowerCase().includes(q) || (r.hotspot_dns_name||'').toLowerCase().includes(q));
   const tb=document.getElementById('tbody');
   tb.innerHTML='';
   if(filtered.length===0){ document.getElementById('empty').style.display='block'; }
@@ -250,7 +227,6 @@ function renderRouters(){
   filtered.forEach(r=>{
     const tr=document.createElement('tr');
     const cust = customers.find(c=>c.id===r.customer_id);
-    const disabled = r.status!=='active';
     tr.innerHTML=`
       <td><strong>${esc(r.network_name||r.router_name||'-')}</strong></td>
       <td>${esc(r.network_number||'-')}</td>
@@ -265,7 +241,7 @@ function renderRouters(){
       <td><span class="badge ${r.status==='active'?'active':'pending'}">${esc(r.status)}</span></td>
       <td><button class="btn sm ${r.renewal_enabled?'primary':'ghost'}" onclick="toggleRenewal('${r.id}',${!r.renewal_enabled})">${r.renewal_enabled?'مفعّل':'موقف'}</button></td>
       <td><div class="row-actions">
-        ${disabled
+        ${r.status!=='active'
           ? `<button class="btn sm primary" onclick="setStatus('${r.id}','active')">تفعيل</button>`
           : `<button class="btn sm ghost" onclick="setStatus('${r.id}','disabled')">إيقاف</button>`}
         <button class="btn sm danger" onclick="delRouter('${r.id}')">حذف</button>
@@ -292,17 +268,6 @@ async function delRouter(id){
   if(!confirm('حذف الموجه؟ (سيتم حذف شهاداته)')) return;
   try{ await api('/api/routers/'+id,{method:'DELETE'}); load(); }catch(e){ alert('خطأ: '+e.message); }
 }
-async function revokeCert(id){
-  if(!confirm('إيقاف/إلغاء هذه الشهادة؟')) return;
-  try{ await api('/api/certificates/'+id,{method:'PATCH',body:JSON.stringify({status:'revoked',renewal_enabled:false})}); load(); }catch(e){ alert('خطأ: '+e.message); }
-}
-async function toggleCertRenewal(id,val){
-  try{ await api('/api/certificates/'+id,{method:'PATCH',body:JSON.stringify({renewal_enabled:val})}); load(); }catch(e){ alert('خطأ: '+e.message); }
-}
-async function delCert(id){
-  if(!confirm('حذف الشهادة؟')) return;
-  try{ await api('/api/certificates/'+id,{method:'DELETE'}); load(); }catch(e){ alert('خطأ: '+e.message); }
-}
 
 function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -315,8 +280,6 @@ async function addRouter(){
     hotspot_local_ip: document.getElementById('hotspot_local_ip').value.trim(),
     hotspot_dns_name: document.getElementById('hotspot_dns_name').value.trim(),
     hotspot_profile: document.getElementById('hotspot_profile').value.trim()||'hsprof1',
-    owner_name: document.getElementById('owner_name').value.trim(),
-    owner_phone: document.getElementById('owner_phone').value.trim(),
     subscription_months: parseInt(document.getElementById('subscription_months').value,10)||1,
   };
   if(!body.network_name||!body.hotspot_local_ip||!body.hotspot_dns_name){ msg.textContent='يرجى تعبئة الحقول المطلوبة (اسم الشبكة، IP، النطاق)'; msg.className='msg err'; return; }
@@ -327,7 +290,7 @@ async function addRouter(){
     msg.textContent='تمت الإضافة بنجاح ✅'; msg.className='msg ok';
     const info=document.getElementById('agentInfo'); info.style.display='block';
     document.getElementById('agentBox').textContent=`URL Token: ${res.agent.url_token}\nAgent User: ${res.agent.agent_user}\nAgent Secret: ${res.agent.agent_secret}\nBase: https://${location.hostname}/agent/v1/${res.agent.url_token}/`;
-    ['network_name','network_number','hotspot_local_ip','hotspot_dns_name','owner_name','owner_phone'].forEach(id=>document.getElementById(id).value='');
+    ['network_name','network_number','hotspot_local_ip','hotspot_dns_name'].forEach(id=>document.getElementById(id).value='');
   }catch(e){ msg.textContent='خطأ: '+e.message; msg.className='msg err'; }
 }
 
@@ -359,7 +322,7 @@ async function loadCertsTable(){
     c.forEach(x=>{
       const r=routers.find(rr=>rr.id===x.router_id);
       const tr=document.createElement('tr');
-      tr.innerHTML=`<td>${esc(r?.network_name||r?.router_name||'-')}</td><td>${esc(x.version)}</td><td><span class="badge ${x.status==='issued'?'active':(x.status==='revoked'?'pending':'pending')}">${esc(x.status)}</span></td><td>${esc(x.not_after?new Date(x.not_after).toLocaleDateString():'-')}</td><td>${esc(x.source)}</td>
+      tr.innerHTML=`<td>${esc(r?.network_name||r?.router_name||'-')}</td><td>${esc(x.version)}</td><td><span class="badge ${x.status==='issued'?'active':'pending'}">${esc(x.status)}</span></td><td>${esc(x.not_after?new Date(x.not_after).toLocaleDateString():'-')}</td><td>${esc(x.source)}</td>
         <td><button class="btn sm ${x.renewal_enabled?'primary':'ghost'}" onclick="toggleCertRenewal('${x.id}',${!x.renewal_enabled})">${x.renewal_enabled?'مفعّل':'موقف'}</button></td>
         <td><div class="row-actions">
           ${x.status!=='revoked'?`<button class="btn sm ghost" onclick="revokeCert('${x.id}')">إيقاف</button>`:''}
@@ -368,6 +331,17 @@ async function loadCertsTable(){
       tb.appendChild(tr);
     });
   }catch{}
+}
+async function revokeCert(id){
+  if(!confirm('إيقاف/إلغاء هذه الشهادة؟')) return;
+  try{ await api('/api/certificates/'+id,{method:'PATCH',body:JSON.stringify({status:'revoked',renewal_enabled:false})}); load(); }catch(e){ alert('خطأ: '+e.message); }
+}
+async function toggleCertRenewal(id,val){
+  try{ await api('/api/certificates/'+id,{method:'PATCH',body:JSON.stringify({renewal_enabled:val})}); load(); }catch(e){ alert('خطأ: '+e.message); }
+}
+async function delCert(id){
+  if(!confirm('حذف الشهادة؟')) return;
+  try{ await api('/api/certificates/'+id,{method:'DELETE'}); load(); }catch(e){ alert('خطأ: '+e.message); }
 }
 
 load();
