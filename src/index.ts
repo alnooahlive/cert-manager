@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import pool from './db';
 import app from './server';
+import { hashPassword } from './auth';
 
 async function runMigrations() {
   try {
@@ -14,6 +15,15 @@ async function runMigrations() {
       await pool.query(sql);
     }
     console.log('migrations done');
+    // seed admin if none
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@alnooah.pro';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'Admin123!ChangeMe';
+    const existing = await pool.query('SELECT id FROM users LIMIT 1');
+    if (existing.rows.length === 0) {
+      const hash = await hashPassword(adminPassword);
+      await pool.query('INSERT INTO users(email,password_hash) VALUES($1,$2)', [adminEmail, hash]);
+      console.log('seeded admin:', adminEmail);
+    }
   } catch (e) {
     console.error('migration error', e);
   }

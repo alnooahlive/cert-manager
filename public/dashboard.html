@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>لوحة التحكم — مدير الشهادات</title>
+<style>
+  :root{--bg:#0b1220;--panel:#111a2e;--card:#16203a;--border:#24324f;--text:#e6edf7;--muted:#8fa3c4;--accent:#3b82f6;--accent2:#8b5cf6;--ok:#22c55e;--warn:#f59e0b;--danger:#ef4444}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,Arial,sans-serif;min-height:100vh}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;background:linear-gradient(180deg,#111a2e,#0b1220);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
+  .topbar h1{margin:0;font-size:20px;display:flex;align-items:center;gap:10px}
+  .topbar .dot{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
+  .btn{padding:9px 16px;border-radius:9px;border:none;cursor:pointer;font-weight:600;font-size:14px}
+  .btn.primary{background:var(--accent);color:#fff}
+  .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
+  .btn.danger{background:var(--danger);color:#fff}
+  .layout{display:grid;grid-template-columns:360px 1fr;gap:22px;padding:24px 28px;max-width:1400px;margin:0 auto}
+  @media(max-width:900px){.layout{grid-template-columns:1fr}}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px}
+  .card h2{margin:0 0 16px;font-size:17px;display:flex;align-items:center;gap:8px}
+  label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px;font-weight:600}
+  input,select{width:100%;padding:11px 13px;border-radius:9px;border:1px solid var(--border);background:#0b1220;color:var(--text);font-size:14px}
+  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .msg{margin-top:12px;font-size:13px;min-height:18px}
+  .msg.ok{color:var(--ok)} .msg.err{color:var(--danger)}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+  .stat{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px}
+  .stat .n{font-size:26px;font-weight:700}
+  .stat .l{color:var(--muted);font-size:12px;margin-top:2px}
+  .table-wrap{overflow:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:12px 10px;text-align:right;border-bottom:1px solid var(--border)}
+  th{color:var(--muted);font-weight:600;font-size:12px;background:#0e1628;position:sticky;top:0}
+  tr:hover td{background:#0e1628}
+  .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600}
+  .badge.active{background:#14532d;color:#86efac}
+  .badge.pending{background:#78350f;color:#fcd34d}
+  .empty{padding:30px;text-align:center;color:var(--muted)}
+  .agent-box{background:#0b1220;border:1px dashed var(--border);border-radius:9px;padding:10px;margin-top:8px;font-family:monospace;font-size:12px;word-break:break-all;color:#93c5fd}
+  .row-actions{display:flex;gap:6px}
+  .icon-btn{padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:12px}
+  .icon-btn:hover{color:var(--text);border-color:var(--accent)}
+  .search{margin-bottom:14px;display:flex;gap:10px}
+  .search input{flex:1}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1><div class="dot">SSL</div> مدير الشهادات — Mikrotik Hotspot</h1>
+  <div style="display:flex;gap:10px;align-items:center">
+    <span id="user" style="color:var(--muted);font-size:13px"></span>
+    <button class="btn ghost" onclick="logout()">تسجيل الخروج</button>
+  </div>
+</div>
+
+<div class="layout">
+  <!-- Form -->
+  <div>
+    <div class="card">
+      <h2>➕ إضافة شهادة / مشترك جديد</h2>
+      <label>اسم الشبكة (Network Name)</label>
+      <input id="network_name" placeholder="مثال: cafenet" />
+      <div class="form-grid">
+        <div>
+          <label>رقم الشبكة (Network Number)</label>
+          <input id="network_number" placeholder="مثال: 1" />
+        </div>
+        <div>
+          <label>RouterOS Major</label>
+          <select id="ros_major"><option value="7">7</option><option value="6">6</option></select>
+        </div>
+      </div>
+      <label>IP المحلي للموجه (Local IP)</label>
+      <input id="hotspot_local_ip" placeholder="192.168.88.1" />
+      <label>النطاق الفرعي (Subdomain)</label>
+      <input id="hotspot_dns_name" placeholder="hotspot.example.com" />
+      <label>اسم ملف Hotspot Profile</label>
+      <input id="hotspot_profile" placeholder="hsprof1" />
+      <div class="form-grid">
+        <div>
+          <label>اسم مالك الشبكة</label>
+          <input id="owner_name" placeholder="اسم المالك" />
+        </div>
+        <div>
+          <label>هاتف مالك الشبكة</label>
+          <input id="owner_phone" placeholder="+964..." />
+        </div>
+      </div>
+      <label>مدة الاشتراك (أشهر)</label>
+      <input id="subscription_months" type="number" value="1" min="1" />
+      <button class="btn primary" style="width:100%;margin-top:16px" onclick="addRouter()">حفظ وإضافة تلقائياً</button>
+      <div class="msg" id="msg"></div>
+      <div id="agentInfo" style="display:none">
+        <label>بيانات الوكيل (Agent) — انسخ إلى الموجه:</label>
+        <div class="agent-box" id="agentBox"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- List -->
+  <div>
+    <div class="stats">
+      <div class="stat"><div class="n" id="stTotal">0</div><div class="l">إجمالي الموجهات</div></div>
+      <div class="stat"><div class="n" id="stActive">0</div><div class="l">نشطة</div></div>
+      <div class="stat"><div class="n" id="stCerts">0</div><div class="l">شهادات صادرة</div></div>
+    </div>
+    <div class="card">
+      <h2>📋 المشتركون / الموجهات</h2>
+      <div class="search"><input id="q" placeholder="بحث بالاسم أو IP أو النطاق..." oninput="render()" /></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>اسم الشبكة</th><th>رقم</th><th>IP</th><th>النطاق</th><th>المالك</th><th>الهاتف</th><th>ROS</th><th>الحالة</th><th>إجراءات</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+        <div class="empty" id="empty" style="display:none">لا توجد بيانات</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const token=localStorage.getItem('token');
+if(!token){ location.href='/login'; }
+const H={'Authorization':'Bearer '+token,'Content-Type':'application/json'};
+let routers=[];
+
+function logout(){ localStorage.removeItem('token'); location.href='/login'; }
+
+async function api(path,opts){ const r=await fetch(path,{...(opts||{}),headers:{...H,...(opts?.headers||{})}}); const t=await r.text(); let d; try{d=JSON.parse(t)}catch{d=t} if(!r.ok) throw new Error(d.error||r.statusText); return d; }
+
+async function load(){
+  try{
+    routers=await api('/api/routers');
+    document.getElementById('user').textContent='admin@alnooah.pro';
+    render();
+    loadCertsCount();
+  }catch(e){ if(e.message.includes('401')||e.message.includes('unauthorized')){localStorage.removeItem('token');location.href='/login';} }
+}
+
+async function loadCertsCount(){
+  try{ const c=await api('/api/certificates'); document.getElementById('stCerts').textContent=c.length; }catch{}
+}
+
+function render(){
+  const q=document.getElementById('q').value.toLowerCase();
+  const filtered=routers.filter(r=> (r.network_name||r.router_name||'').toLowerCase().includes(q) || (r.hotspot_local_ip||'').toLowerCase().includes(q) || (r.hotspot_dns_name||'').toLowerCase().includes(q) || (r.customer_name||'').toLowerCase().includes(q));
+  const tb=document.getElementById('tbody');
+  tb.innerHTML='';
+  if(filtered.length===0){ document.getElementById('empty').style.display='block'; }
+  else { document.getElementById('empty').style.display='none'; }
+  filtered.forEach(r=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td><strong>${esc(r.network_name||r.router_name||'-')}</strong></td>
+      <td>${esc(r.network_number||'-')}</td>
+      <td>${esc(r.hotspot_local_ip)}</td>
+      <td>${esc(r.hotspot_dns_name)}</td>
+      <td>${esc(r.customer_name||'-')}</td>
+      <td>${esc(r.phone||'-')}</td>
+      <td>${esc(r.ros_major)}</td>
+      <td><span class="badge ${r.status==='active'?'active':'pending'}">${esc(r.status)}</span></td>
+      <td><div class="row-actions">
+        <button class="icon-btn" onclick="viewAgent('${r.id}')">وكيل</button>
+      </div></td>`;
+    tb.appendChild(tr);
+  });
+  document.getElementById('stTotal').textContent=routers.length;
+  document.getElementById('stActive').textContent=routers.filter(r=>r.status==='active').length;
+}
+
+function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function addRouter(){
+  const msg=document.getElementById('msg'); msg.textContent=''; msg.className='msg';
+  const body={
+    network_name: document.getElementById('network_name').value.trim(),
+    network_number: document.getElementById('network_number').value.trim(),
+    ros_major: parseInt(document.getElementById('ros_major').value,10),
+    hotspot_local_ip: document.getElementById('hotspot_local_ip').value.trim(),
+    hotspot_dns_name: document.getElementById('hotspot_dns_name').value.trim(),
+    hotspot_profile: document.getElementById('hotspot_profile').value.trim()||'hsprof1',
+    owner_name: document.getElementById('owner_name').value.trim(),
+    owner_phone: document.getElementById('owner_phone').value.trim(),
+    subscription_months: parseInt(document.getElementById('subscription_months').value,10)||1,
+  };
+  if(!body.network_name||!body.hotspot_local_ip||!body.hotspot_dns_name){ msg.textContent='يرجى تعبئة الحقول المطلوبة (اسم الشبكة، IP، النطاق)'; msg.className='msg err'; return; }
+  try{
+    const res=await api('/api/routers',{method:'POST',body:JSON.stringify(body)});
+    routers.unshift(res.router);
+    render();
+    msg.textContent='تمت الإضافة بنجاح ✅'; msg.className='msg ok';
+    const info=document.getElementById('agentInfo'); info.style.display='block';
+    document.getElementById('agentBox').textContent=`URL Token: ${res.agent.url_token}\nAgent User: ${res.agent.agent_user}\nAgent Secret: ${res.agent.agent_secret}\nBase: https://${location.hostname}/agent/v1/${res.agent.url_token}/`;
+    // reset
+    ['network_name','network_number','hotspot_local_ip','hotspot_dns_name','owner_name','owner_phone'].forEach(id=>document.getElementById(id).value='');
+  }catch(e){ msg.textContent='خطأ: '+e.message; msg.className='msg err'; }
+}
+
+async function viewAgent(id){
+  try{
+    const c=await api('/api/routers/'+id+'/agent');
+    alert(`URL Token: ${c.url_token}\nAgent User: ${c.agent_user}\nAgent Secret: ${c.agent_secret}\nBase: https://${location.hostname}/agent/v1/${c.url_token}/`);
+  }catch(e){ alert('خطأ: '+e.message); }
+}
+
+load();
+</script>
+</body>
+</html>

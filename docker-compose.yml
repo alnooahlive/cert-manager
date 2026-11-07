@@ -16,6 +16,8 @@ services:
       TZ: ${TZ:-UTC}
       LOG_LEVEL: ${LOG_LEVEL:-info}
       PORT: "3000"
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@alnooah.pro}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin123!ChangeMe}
     ports:
       - "3000:3000"
     depends_on:

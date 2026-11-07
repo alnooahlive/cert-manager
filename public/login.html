@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>تسجيل الدخول — مدير الشهادات</title>
+<style>
+  :root{--bg:#0f172a;--card:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;--accent:#3b82f6;--danger:#ef4444}
+  *{box-sizing:border-box}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(1200px 600px at 50% -10%,#1e3a8a33,transparent),var(--bg);font-family:'Segoe UI',Tahoma,Arial,sans-serif;color:var(--text)}
+  .card{width:100%;max-width:400px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:36px 32px;box-shadow:0 20px 60px #0006}
+  h1{margin:0 0 6px;font-size:24px}
+  p.sub{margin:0 0 24px;color:var(--muted);font-size:14px}
+  label{display:block;font-size:13px;color:var(--muted);margin:14px 0 6px}
+  input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:#0b1220;color:var(--text);font-size:15px}
+  input:focus{outline:none;border-color:var(--accent)}
+  button{width:100%;margin-top:22px;padding:13px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:16px;font-weight:600;cursor:pointer}
+  button:hover{filter:brightness(1.1)}
+  .err{margin-top:14px;color:var(--danger);font-size:13px;min-height:18px}
+  .logo{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+  .logo .dot{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);display:flex;align-items:center;justify-content:center;font-weight:700}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo"><div class="dot">SSL</div><div><h1 style="margin:0;font-size:20px">مدير الشهادات</h1><p style="margin:0;color:var(--muted);font-size:12px">Mikrotik Hotspot</p></div></div>
+    <p class="sub">تسجيل الدخول للمسؤول</p>
+    <label>البريد الإلكتروني</label>
+    <input id="email" type="email" autocomplete="username" />
+    <label>كلمة المرور</label>
+    <input id="password" type="password" autocomplete="current-password" />
+    <button onclick="login()">دخول</button>
+    <div class="err" id="err"></div>
+  </div>
+<script>
+async function login(){
+  const err=document.getElementById('err'); err.textContent='';
+  try{
+    const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email.value,password:password.value}),credentials:'include'});
+    const d=await r.json();
+    if(!r.ok){ err.textContent=d.error||'فشل الدخول'; return; }
+    localStorage.setItem('token',d.token);
+    location.href='/dashboard';
+  }catch(e){ err.textContent='خطأ في الاتصال'; }
+}
+document.addEventListener('keydown',e=>{ if(e.key==='Enter') login(); });
+</script>
+</body>
+</html>

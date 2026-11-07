@@ -26,8 +26,8 @@ app.use('/agent/v1', agentRoutes);
 
 // static frontend
 app.use(express.static(path.join(process.cwd(), 'public')));
-app.get('*', (_req, res) => {
-  res.sendFile(path.join(process.cwd(), 'public', 'index.html'));
-});
+app.get('/login', (_req, res) => res.sendFile(path.join(process.cwd(), 'public', 'login.html')));
+app.get('/dashboard', (_req, res) => res.sendFile(path.join(process.cwd(), 'public', 'dashboard.html')));
+app.get('/', (_req, res) => res.sendFile(path.join(process.cwd(), 'public', 'dashboard.html')));
 
 export default app;

@@ -5,18 +5,6 @@ import cookieParser from 'cookie-parser';
 
 const router = Router();
 
-router.post('/register', async (req, res) => {
-  const { email, password } = req.body || {};
-  if (!email || !password) return res.status(400).json({ error: 'missing' });
-  const hash = await hashPassword(password);
-  try {
-    const rows = await query('INSERT INTO users(email,password_hash) VALUES($1,$2) RETURNING id,email', [email, hash]);
-    res.json(rows[0]);
-  } catch (e: any) {
-    res.status(400).json({ error: e.message });
-  }
-});
-
 router.post('/login', async (req, res) => {
   const { email, password } = req.body || {};
   const u = await one('SELECT * FROM users WHERE email=$1', [email]);
