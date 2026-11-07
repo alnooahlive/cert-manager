@@ -1,14 +1,27 @@
 import cron from 'node-cron';
-import { query } from './db';
+import { query, one } from './db';
+import { issueCertificate } from './acme-issue';
+
+async function issueMissing() {
+  // routers without any issued cert
+  const rows = await query(`SELECT r.id FROM routers r WHERE r.status='active' AND NOT EXISTS (SELECT 1 FROM certificates c WHERE c.router_id=r.id AND c.status='issued')`);
+  for (const r of rows) {
+    try { await issueCertificate(r.id); console.log('[worker] issued for', r.id); }
+    catch (e: any) { console.error('[worker] issue failed', r.id, e.message); }
+  }
+}
 
 async function renewScan() {
   console.log('[worker] renew scan tick');
-  // placeholder: find certs expiring soon
-  const rows = await query(`SELECT id,router_id,not_after FROM certificates WHERE status='issued' AND not_after < now() + interval '14 days'`);
-  console.log('[worker] expiring soon:', rows.length);
+  const rows = await query(`SELECT router_id FROM certificates WHERE status='issued' AND renewal_enabled=true AND not_after < now() + interval '14 days'`);
+  for (const r of rows) {
+    try { await issueCertificate(r.router_id); console.log('[worker] renewed for', r.router_id); }
+    catch (e: any) { console.error('[worker] renew failed', r.router_id, e.message); }
+  }
 }
 
-cron.schedule('0 */6 * * *', () => { renewScan().catch(console.error); });
+// run issueMissing on startup
+issueMissing().catch(e => console.error(e));
+cron.schedule('0 */6 * * *', () => { renewScan().catch(console.error); issueMissing().catch(console.error); });
 console.log('worker started');
-// keep alive
 setInterval(() => {}, 1 << 30);

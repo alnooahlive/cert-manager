@@ -3,6 +3,7 @@ import { query, one } from '../db';
 import { authMiddleware } from '../auth';
 import { generateUrlToken, generateAgentSecret } from '../acme';
 import { bootstrapScript, updateScript, allInOne, ScriptContext } from '../scripts';
+import { issueCertificate } from '../acme-issue';
 
 const router = Router();
 router.use(authMiddleware);
@@ -37,6 +38,8 @@ router.post('/', async (req, res) => {
   const agent_user = 'agent_' + r.id.slice(0,8);
   const agent_secret = generateAgentSecret();
   await query('INSERT INTO agent_credentials(router_id,url_token,agent_user,agent_secret,reveal_until) VALUES($1,$2,$3,$4,now()+interval \'24 hours\')', [r.id, url_token, agent_user, agent_secret]);
+  // auto-issue certificate in background
+  issueCertificate(r.id).then(res => console.log('issued cert for', r.id, res)).catch(e => console.error('issue failed for', r.id, e.message));
   res.json({ router: r, agent: { url_token, agent_user, agent_secret } });
 });
 
@@ -138,6 +141,15 @@ ${ros === '6' ? '/ip hotspot profile set [find where name=' + r.hotspot_profile 
 # /tool fetch url=${base}/version.txt user=${cred.agent_user} password=${cred.agent_secret} check-certificate=yes dst-path=hs-ver.txt
 `;
   res.type('text/plain').send(script);
+});
+
+router.post('/:id/issue', async (req, res) => {
+  try {
+    const result = await issueCertificate(req.params.id);
+    res.json({ ok: true, ...result });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 export default router;
