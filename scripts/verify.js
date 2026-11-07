@@ -63,6 +63,12 @@ async function main() {
     const ar2 = await fetch(BASE + '/agent/v1/' + cred.url_token + '/version.txt', { headers: { Authorization: 'Basic ' + b64 } });
     check('disabled blocks agent (non-200)', ar2.status !== 200, String(ar2.status));
 
+    // scripts
+    const sr = await req('/api/routers/' + rid + '/scripts?ros=7');
+    check('scripts v7 200', sr.status === 200 && sr.data.allInOne && sr.data.allInOne.length > 1000, JSON.stringify(sr.data).slice(0,80));
+    const sr6 = await req('/api/routers/' + rid + '/scripts?ros=6');
+    check('scripts v6 200', sr6.status === 200 && sr6.data.bootstrap && sr6.data.bootstrap.length > 1000, String(sr6.status));
+
     // re-enable + delete
     await req('/api/routers/' + rid, { method: 'PATCH', body: JSON.stringify({ status: 'active' }) });
     const dr = await req('/api/routers/' + rid, { method: 'DELETE' });
