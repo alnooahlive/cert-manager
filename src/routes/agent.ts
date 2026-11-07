@@ -7,6 +7,8 @@ const router = Router();
 async function resolve(token: string) {
   const cred = await one('SELECT * FROM agent_credentials WHERE url_token=$1', [token]);
   if (!cred) return null;
+  const router = await one('SELECT status, renewal_enabled FROM routers WHERE id=$1', [cred.router_id]);
+  if (!router || router.status !== 'active' || router.renewal_enabled === false) return null;
   return cred;
 }
 

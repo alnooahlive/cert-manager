@@ -153,7 +153,7 @@
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>اسم الشبكة</th><th>رقم</th><th>IP</th><th>النطاق</th><th>العميل</th><th>المالك</th><th>الهاتف</th><th>ROS</th><th>الحالة</th><th>شهادة/سكربت</th>
+            <th>اسم الشبكة</th><th>رقم</th><th>IP</th><th>النطاق</th><th>العميل</th><th>ROS</th><th>الحالة</th><th>التجديد</th><th>إجراءات</th>
           </tr></thead>
           <tbody id="tbody"></tbody>
         </table>
@@ -166,7 +166,7 @@
       <h2>📜 الشهادات</h2>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>الموجه</th><th>الإصدار</th><th>الحالة</th><th>تنتهي في</th><th>المصدر</th></tr></thead>
+          <thead><tr><th>الموجه</th><th>الإصدار</th><th>الحالة</th><th>تنتهي في</th><th>المصدر</th><th>التجديد</th><th>إجراءات</th></tr></thead>
           <tbody id="certsBody"></tbody>
         </table>
         <div class="empty" id="certsEmpty" style="display:none">لا توجد شهادات</div>
@@ -249,23 +249,27 @@ function renderRouters(){
   filtered.forEach(r=>{
     const tr=document.createElement('tr');
     const cust = customers.find(c=>c.id===r.customer_id);
+    const disabled = r.status!=='active';
     tr.innerHTML=`
       <td><strong>${esc(r.network_name||r.router_name||'-')}</strong></td>
       <td>${esc(r.network_number||'-')}</td>
       <td>${esc(r.hotspot_local_ip)}</td>
       <td>${esc(r.hotspot_dns_name)}</td>
-      <td>${esc(cust?.name||r.customer_name||'-')}</td>
-      <td>${esc(r.customer_name||'-')}</td>
-      <td>${esc(r.phone||'-')}</td>
+      <td>${esc(cust?.name||'-')}</td>
       <td><select onchange="setRos('${r.id}',this.value)" style="width:70px;padding:4px">
         <option value="" ${!r.ros_major?'selected':''}>-</option>
         <option value="6" ${r.ros_major==6?'selected':''}>6</option>
         <option value="7" ${r.ros_major==7?'selected':''}>7</option>
       </select></td>
       <td><span class="badge ${r.status==='active'?'active':'pending'}">${esc(r.status)}</span></td>
+      <td><button class="btn sm ${r.renewal_enabled?'primary':'ghost'}" onclick="toggleRenewal('${r.id}',${!r.renewal_enabled})">${r.renewal_enabled?'مفعّل':'موقف'}</button></td>
       <td><div class="row-actions">
-        <button class="btn sm ghost" onclick="genScript('${r.id}',6)">سكربت v6</button>
-        <button class="btn sm ghost" onclick="genScript('${r.id}',7)">سكربت v7</button>
+        ${disabled
+          ? `<button class="btn sm primary" onclick="setStatus('${r.id}','active')">تفعيل</button>`
+          : `<button class="btn sm ghost" onclick="setStatus('${r.id}','disabled')">إيقاف</button>`}
+        <button class="btn sm danger" onclick="delRouter('${r.id}')">حذف</button>
+        <button class="btn sm ghost" onclick="genScript('${r.id}',6)">v6</button>
+        <button class="btn sm ghost" onclick="genScript('${r.id}',7)">v7</button>
         <button class="btn sm ghost" onclick="viewAgent('${r.id}')">وكيل</button>
       </div></td>`;
     tb.appendChild(tr);
@@ -276,6 +280,27 @@ function renderRouters(){
 
 async function setRos(id,val){
   try{ await api('/api/routers/'+id,{method:'PATCH',body:JSON.stringify({ros_major: val?parseInt(val,10):null})}); }catch(e){ alert('خطأ: '+e.message); }
+}
+async function setStatus(id,status){
+  try{ await api('/api/routers/'+id,{method:'PATCH',body:JSON.stringify({status})}); load(); }catch(e){ alert('خطأ: '+e.message); }
+}
+async function toggleRenewal(id,val){
+  try{ await api('/api/routers/'+id,{method:'PATCH',body:JSON.stringify({renewal_enabled:val})}); load(); }catch(e){ alert('خطأ: '+e.message); }
+}
+async function delRouter(id){
+  if(!confirm('حذف الموجه؟ (سيتم حذف شهاداته)')) return;
+  try{ await api('/api/routers/'+id,{method:'DELETE'}); load(); }catch(e){ alert('خطأ: '+e.message); }
+}
+async function revokeCert(id){
+  if(!confirm('إيقاف/إلغاء هذه الشهادة؟')) return;
+  try{ await api('/api/certificates/'+id,{method:'PATCH',body:JSON.stringify({status:'revoked',renewal_enabled:false})}); load(); }catch(e){ alert('خطأ: '+e.message); }
+}
+async function toggleCertRenewal(id,val){
+  try{ await api('/api/certificates/'+id,{method:'PATCH',body:JSON.stringify({renewal_enabled:val})}); load(); }catch(e){ alert('خطأ: '+e.message); }
+}
+async function delCert(id){
+  if(!confirm('حذف الشهادة؟')) return;
+  try{ await api('/api/certificates/'+id,{method:'DELETE'}); load(); }catch(e){ alert('خطأ: '+e.message); }
 }
 
 function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -333,7 +358,12 @@ async function loadCertsTable(){
     c.forEach(x=>{
       const r=routers.find(rr=>rr.id===x.router_id);
       const tr=document.createElement('tr');
-      tr.innerHTML=`<td>${esc(r?.network_name||r?.router_name||'-')}</td><td>${esc(x.version)}</td><td><span class="badge ${x.status==='issued'?'active':'pending'}">${esc(x.status)}</span></td><td>${esc(x.not_after?new Date(x.not_after).toLocaleDateString():'-')}</td><td>${esc(x.source)}</td>`;
+      tr.innerHTML=`<td>${esc(r?.network_name||r?.router_name||'-')}</td><td>${esc(x.version)}</td><td><span class="badge ${x.status==='issued'?'active':(x.status==='revoked'?'pending':'pending')}">${esc(x.status)}</span></td><td>${esc(x.not_after?new Date(x.not_after).toLocaleDateString():'-')}</td><td>${esc(x.source)}</td>
+        <td><button class="btn sm ${x.renewal_enabled?'primary':'ghost'}" onclick="toggleCertRenewal('${x.id}',${!x.renewal_enabled})">${x.renewal_enabled?'مفعّل':'موقف'}</button></td>
+        <td><div class="row-actions">
+          ${x.status!=='revoked'?`<button class="btn sm ghost" onclick="revokeCert('${x.id}')">إيقاف</button>`:''}
+          <button class="btn sm danger" onclick="delCert('${x.id}')">حذف</button>
+        </div></td>`;
       tb.appendChild(tr);
     });
   }catch{}

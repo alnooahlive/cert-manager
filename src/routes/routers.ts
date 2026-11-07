@@ -45,12 +45,19 @@ router.patch('/:id', async (req, res) => {
        network_name=COALESCE($11,network_name),
        network_number=COALESCE($12,network_number),
        status=COALESCE($13,status),
+       renewal_enabled=COALESCE($14,renewal_enabled),
+       revoked_at=CASE WHEN $13='revoked' THEN now() ELSE revoked_at END,
        updated_at=now()
-     WHERE id=$14 RETURNING *`,
+     WHERE id=$15 RETURNING *`,
     [b.customer_id, b.owner_name || b.customer_name, b.owner_phone || b.phone, b.email, b.network_name || b.router_name,
-     b.ros_major, b.hotspot_profile, b.hotspot_local_ip, b.hotspot_dns_name, b.subscription_months, b.network_name, b.network_number, b.status, req.params.id]
+     b.ros_major, b.hotspot_profile, b.hotspot_local_ip, b.hotspot_dns_name, b.subscription_months, b.network_name, b.network_number, b.status, b.renewal_enabled, req.params.id]
   );
   res.json(row);
+});
+
+router.delete('/:id', async (req, res) => {
+  await query('DELETE FROM routers WHERE id=$1', [req.params.id]);
+  res.json({ ok: true });
 });
 
 router.get('/:id', async (req, res) => {
