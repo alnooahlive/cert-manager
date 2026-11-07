@@ -15,12 +15,13 @@ import agentRoutes from './routes/agent';
 import cfRoutes from './routes/cloudflare';
 
 const app = express();
+app.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '5mb' }));
 app.use(cookieParser());
 
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false, validate: { xForwardedForHeader: false } });
 app.use('/api/auth/login', authLimiter);
 
 // simple request log
