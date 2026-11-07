@@ -18,11 +18,14 @@ async function runMigrations() {
     // seed admin if none
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@alnooah.pro';
     const adminPassword = process.env.ADMIN_PASSWORD || 'Admin123!ChangeMe';
-    const existing = await pool.query('SELECT id FROM users LIMIT 1');
+    const hash = await hashPassword(adminPassword);
+    const existing = await pool.query('SELECT id FROM users WHERE email=$1', [adminEmail]);
     if (existing.rows.length === 0) {
-      const hash = await hashPassword(adminPassword);
       await pool.query('INSERT INTO users(email,password_hash) VALUES($1,$2)', [adminEmail, hash]);
       console.log('seeded admin:', adminEmail);
+    } else {
+      await pool.query('UPDATE users SET password_hash=$1 WHERE email=$2', [hash, adminEmail]);
+      console.log('updated admin password:', adminEmail);
     }
   } catch (e) {
     console.error('migration error', e);
