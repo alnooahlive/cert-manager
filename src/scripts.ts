@@ -16,9 +16,33 @@ function esc(s: string): string {
   return String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
+function cleanScript(raw: string): string {
+  const lines = raw.split('\n');
+  const out: string[] = [];
+  for (let ln of lines) {
+    const s = ln.trim();
+    if (s.startsWith('#')) continue;
+    if (s === '') continue;
+    // strip trailing comments (but keep source={)
+    if (ln.includes('source={')) {
+      ln = ln.split('source={', 1)[0] + 'source={';
+    } else if (ln.includes(' #') && !ln.includes('source={')) {
+      ln = ln.split(' #', 1)[0].trimEnd();
+      if (ln.trim() === '') continue;
+    }
+    const t = ln.trimEnd();
+    if (t.endsWith('{') || t.endsWith('}') || t.endsWith(';') || t === '') {
+      out.push(t);
+    } else {
+      out.push(t + ';');
+    }
+  }
+  return out.join('\n');
+}
+
 export function updateScript(ctx: ScriptContext): string {
   const base = `https://${ctx.agent_host}/agent/v1/${ctx.url_token}`;
-  return `# ===== hs-cert-update | router=${ctx.router_name} | ROS auto | template v${ctx.template_version || '1'} =====
+  return cleanScript(`# ===== hs-cert-update | router=${ctx.router_name} | ROS auto | template v${ctx.template_version || '1'} =====
 :local sname "hs-cert-update"
 :local profile "${esc(ctx.hotspot_profile)}"
 :local base "${esc(base)}"
@@ -122,11 +146,11 @@ export function updateScript(ctx: ScriptContext): string {
 :log info ("hs-cert: updated to version " . $ver)
 :put "hs-cert: DONE"
 :return
-`;
+`);
 }
 
 export function bootstrapScript(ctx: ScriptContext): string {
-  return `# ===== hs-cert bootstrap (AUTO) | router=${ctx.router_name} | template v${ctx.template_version || '1'} =====
+  return cleanScript(`# ===== hs-cert bootstrap (AUTO) | router=${ctx.router_name} | template v${ctx.template_version || '1'} =====
 # 0) backup (disabled)
 # /export file=before-hs-cert
 # /system backup save name=before-hs-cert
@@ -159,7 +183,7 @@ export function bootstrapScript(ctx: ScriptContext): string {
 
 # 6) run once
 /system script run hs-cert-update
-`;
+`) ;
 }
 
 export function allInOne(ctx: ScriptContext): string {
