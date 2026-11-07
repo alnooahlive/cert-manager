@@ -52,7 +52,8 @@ export function updateScript(ctx: ScriptContext): string {
 :local ver [/file get [find where name="hs-ver.txt"] contents]
 /file remove [find where name="hs-ver.txt"]
 :if ($ver = [/system script get [find where name=$sname] comment]) do={
-    :error "hs-cert: up to date"
+    :log info "hs-cert: up to date"
+    :return
 }
 
 # 2) download material
