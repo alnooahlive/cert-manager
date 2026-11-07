@@ -96,8 +96,9 @@
           <input id="hotspot_local_ip" placeholder="192.168.88.1" />
         </div>
       </div>
-      <label>النطاق الفرعي (Subdomain)</label>
-      <input id="hotspot_dns_name" placeholder="hotspot.example.com" />
+      <label>النطاق الفرعي (prefix فقط)</label>
+      <input id="hotspot_dns_name" placeholder="cafe" oninput="updateDnsHint()" />
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">النتيجة: <span id="dnsHint" style="color:#93c5fd"></span></div>
       <label>ملف Hotspot Profile</label>
       <input id="hotspot_profile" placeholder="hsprof1" />
       <label>مدة الاشتراك (أشهر)</label>
@@ -108,6 +109,17 @@
         <label>بيانات الوكيل (Agent):</label>
         <div class="agent-box" id="agentBox"></div>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>🌐 النطاق الرئيسي (Main Domain)</h2>
+      <label>النطاق الرئيسي</label>
+      <input id="main_domain" placeholder="alnooah.pro" />
+      <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:13px">
+        <input id="apply_all" type="checkbox" style="width:auto;margin:0" /> تطبيق على جميع الشبكات (موجودة + جديدة)
+      </label>
+      <button class="btn primary" style="width:100%;margin-top:12px" onclick="saveMainDomain()">حفظ</button>
+      <div class="msg" id="dmsg"></div>
     </div>
   </div>
 
@@ -183,13 +195,17 @@
 const token=localStorage.getItem('token');
 if(!token){ location.href='/login'; }
 const H={'Authorization':'Bearer '+token,'Content-Type':'application/json'};
-let routers=[]; let customers=[];
+let routers=[]; let customers=[]; let mainDomain='alnooah.pro';
 
 function logout(){ localStorage.removeItem('token'); location.href='/login'; }
 async function api(path,opts){ const r=await fetch(path,{...(opts||{}),headers:{...H,...(opts?.headers||{})}}); const t=await r.text(); let d; try{d=JSON.parse(t)}catch{d=t} if(!r.ok) throw new Error(d.error||r.statusText); return d; }
 
 async function load(){
   try{
+    const s=await api('/api/settings');
+    mainDomain=s.main_domain||'alnooah.pro';
+    document.getElementById('main_domain').value=mainDomain;
+    updateDnsHint();
     customers=await api('/api/customers');
     routers=await api('/api/routers');
     document.getElementById('user').textContent='admin@alnooah.pro';
@@ -288,6 +304,26 @@ async function delRouter(id){
 }
 
 function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function updateDnsHint(){
+  const v=document.getElementById('hotspot_dns_name').value.trim();
+  const hint=document.getElementById('dnsHint');
+  if(!v){ hint.textContent=''; return; }
+  if(v.includes('.')){ hint.textContent=v; }
+  else { hint.textContent=v+'.'+mainDomain; }
+}
+async function saveMainDomain(){
+  const msg=document.getElementById('dmsg'); msg.textContent=''; msg.className='msg';
+  const val=document.getElementById('main_domain').value.trim();
+  const apply=document.getElementById('apply_all').checked;
+  if(!val){ msg.textContent='النطاق مطلوب'; msg.className='msg err'; return; }
+  try{
+    const s=await api('/api/settings',{method:'PATCH',body:JSON.stringify({main_domain:val,apply_to_all:apply})});
+    mainDomain=s.main_domain;
+    msg.textContent='تم حفظ النطاق ✅'+(apply?' (طبق على الجميع)':''); msg.className='msg ok';
+    load();
+  }catch(e){ msg.textContent='خطأ: '+e.message; msg.className='msg err'; }
+}
 
 async function addRouter(){
   const msg=document.getElementById('msg'); msg.textContent=''; msg.className='msg';

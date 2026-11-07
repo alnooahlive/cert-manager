@@ -10,6 +10,7 @@ import authRoutes from './routes/auth';
 import certRoutes from './routes/certificates';
 import routerRoutes from './routes/routers';
 import customerRoutes from './routes/customers';
+import settingsRoutes from './routes/settings';
 import agentRoutes from './routes/agent';
 import cfRoutes from './routes/cloudflare';
 
@@ -33,6 +34,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/certificates', certRoutes);
 app.use('/api/routers', routerRoutes);
 app.use('/api/customers', customerRoutes);
+app.use('/api/settings', settingsRoutes);
 app.use('/api/cloudflare', cfRoutes);
 app.use('/agent/v1', agentRoutes);
 
