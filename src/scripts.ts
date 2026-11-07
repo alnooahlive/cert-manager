@@ -71,6 +71,21 @@ export function updateScript(ctx: ScriptContext): string {
     :error "hs-cert: download failed"
 }
 
+    # wait for files to be written (fetch is async)
+    :local waited 0
+    :while ([:len [/file find where name=$fc]] = 0) do={
+        :delay 1s
+        :set waited ($waited + 1)
+        :if ($waited > 10) do={ :error "hs-cert: fullchain not written" }
+    }
+    :set waited 0
+    :while ([:len [/file find where name=$pk]] = 0) do={
+        :delay 1s
+        :set waited ($waited + 1)
+        :if ($waited > 10) do={ :error "hs-cert: privkey not written" }
+    }
+    :delay 2s
+
 # 3) import
 /certificate import file-name=$fc passphrase=""
 /certificate import file-name=$pk passphrase=""
