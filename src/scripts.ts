@@ -1,7 +1,7 @@
 // Mikrotik RouterOS script generator
 export interface ScriptContext {
   router_name: string;
-  ros_major: number; // 6 or 7
+  ros_major: number;
   hotspot_profile: string;
   hotspot_dns_name: string;
   hotspot_local_ip: string;
@@ -17,7 +17,7 @@ function esc(s: string): string {
 }
 
 export function updateScript(ctx: ScriptContext): string {
-  const ros7 = ctx.ros_major === 7;
+  const cc = ctx.ros_major === 6 ? 'no' : 'yes';
   const base = `https://${ctx.agent_host}/agent/v1/${ctx.url_token}`;
   return `# ===== hs-cert-update | router=${ctx.router_name} | ROS ${ctx.ros_major} | template v${ctx.template_version || '1'} =====
 :local sname "hs-cert-update"
@@ -36,7 +36,7 @@ export function updateScript(ctx: ScriptContext): string {
 /file remove [find where name="hs-ver.txt"]
 :local ok true
 :do {
-    /tool fetch url=($base . "/version.txt") user=$fuser password=$fpass check-certificate=yes dst-path="hs-ver.txt"
+    /tool fetch url=($base . "/version.txt") user=$fuser password=$fpass check-certificate=${cc} dst-path="hs-ver.txt"
 } on-error={ :set ok false }
 :if (!$ok) do={
     :log error "hs-cert: version fetch failed"
@@ -55,12 +55,12 @@ export function updateScript(ctx: ScriptContext): string {
 /file remove [find where name=$pk]
 :set ok true
 :do {
-    /tool fetch url=($base . "/fullchain.pem") user=$fuser password=$fpass check-certificate=yes dst-path=$fc
-    /tool fetch url=($base . "/privkey.pem") user=$fuser password=$fpass check-certificate=yes dst-path=$pk
+    /tool fetch url=($base . "/fullchain.pem") user=$fuser password=$fpass check-certificate=${cc} dst-path=$fc
+    /tool fetch url=($base . "/privkey.pem") user=$fuser password=$fpass check-certificate=${cc} dst-path=$pk
 } on-error={ :set ok false }
 :if (!$ok) do={
     :log error "hs-cert: download failed"
-    :do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=0&step=download") user=$fuser password=$fpass check-certificate=yes output=none } on-error={ }
+    :do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=0&step=download") user=$fuser password=$fpass check-certificate=${cc} output=none } on-error={ }
     :error "hs-cert: download failed"
 }
 
@@ -70,7 +70,7 @@ export function updateScript(ctx: ScriptContext): string {
 :delay 3s
 :if ([:len [/certificate find where name=$newCert]] = 0) do={
     :log error "hs-cert: import failed"
-    :do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=0&step=import") user=$fuser password=$fpass check-certificate=yes output=none } on-error={ }
+    :do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=0&step=import") user=$fuser password=$fpass check-certificate=${cc} output=none } on-error={ }
     /file remove [find where name=$fc]
     /file remove [find where name=$pk]
     :error "hs-cert: import failed"
@@ -87,12 +87,13 @@ export function updateScript(ctx: ScriptContext): string {
 /file remove [find where name=$fc]
 /file remove [find where name=$pk]
 /system script set [find where name=$sname] comment=$ver
-:do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=1&step=bind") user=$fuser password=$fpass check-certificate=yes output=none } on-error={ }
+:do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=1&step=bind") user=$fuser password=$fpass check-certificate=${cc} output=none } on-error={ }
 :log info ("hs-cert: updated to version " . $ver)
 `;
 }
 
 export function bootstrapScript(ctx: ScriptContext): string {
+  const cc = ctx.ros_major === 6 ? 'no' : 'yes';
   const v6note = ctx.ros_major === 6 ? `# RouterOS 6: ensure ISRG root CA imported if check-certificate=yes fails
 # /certificate import file-name=isrg-root-x1.pem passphrase=""
 # test: /tool fetch url="https://${ctx.agent_host}/" check-certificate=yes output=none
