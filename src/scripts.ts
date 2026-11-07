@@ -88,7 +88,9 @@ export function updateScript(ctx: ScriptContext): string {
 
 # 3) import
 /certificate import file-name=$fc passphrase=""
+:delay 2s
 /certificate import file-name=$pk passphrase=""
+:delay 2s
 :delay 3s
 :if ([:len [/certificate find where name=$newCert]] = 0) do={
     :log error "hs-cert: import failed"
@@ -102,10 +104,15 @@ export function updateScript(ctx: ScriptContext): string {
 /ip hotspot profile set [find where name=$profile] dns-name=${ctx.hotspot_dns_name} login-by=https,http-chap
 :if ($rosMajor = 6) do={ /ip hotspot profile set [find where name=$profile] https-redirect=no }
 /ip hotspot profile set [find where name=$profile] ssl-certificate=$newCert
+:delay 2s
 :do { /certificate remove [find where name~"^hs-live"] } on-error={ }
-/certificate set [find where name=$newCert] name="hs-live"
-/certificate set [find where name=$newCa] name="hs-live-ca"
+:delay 1s
+:do { /certificate set [find where name=$newCert] name="hs-live" } on-error={ }
+:delay 1s
+:do { /certificate set [find where name=$newCa] name="hs-live-ca" } on-error={ }
+:delay 1s
 /ip hotspot profile set [find where name=$profile] ssl-certificate="hs-live"
+:delay 1s
 
 # 5) finalize
 :do { /file remove [find where name=$fc] } on-error={ }
