@@ -15,8 +15,9 @@
   .btn.primary{background:var(--accent);color:#fff}
   .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
   .btn.danger{background:var(--danger);color:#fff}
-  .layout{display:grid;grid-template-columns:360px 1fr;gap:22px;padding:24px 28px;max-width:1400px;margin:0 auto}
-  @media(max-width:900px){.layout{grid-template-columns:1fr}}
+  .btn.sm{padding:6px 10px;font-size:12px}
+  .layout{display:grid;grid-template-columns:380px 1fr;gap:22px;padding:24px 28px;max-width:1500px;margin:0 auto}
+  @media(max-width:1000px){.layout{grid-template-columns:1fr}}
   .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px}
   .card h2{margin:0 0 16px;font-size:17px;display:flex;align-items:center;gap:8px}
   label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px;font-weight:600}
@@ -25,7 +26,7 @@
   .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .msg{margin-top:12px;font-size:13px;min-height:18px}
   .msg.ok{color:var(--ok)} .msg.err{color:var(--danger)}
-  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
   .stat{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px}
   .stat .n{font-size:26px;font-weight:700}
   .stat .l{color:var(--muted);font-size:12px;margin-top:2px}
@@ -39,11 +40,15 @@
   .badge.pending{background:#78350f;color:#fcd34d}
   .empty{padding:30px;text-align:center;color:var(--muted)}
   .agent-box{background:#0b1220;border:1px dashed var(--border);border-radius:9px;padding:10px;margin-top:8px;font-family:monospace;font-size:12px;word-break:break-all;color:#93c5fd}
-  .row-actions{display:flex;gap:6px}
-  .icon-btn{padding:6px 10px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;font-size:12px}
-  .icon-btn:hover{color:var(--text);border-color:var(--accent)}
-  .search{margin-bottom:14px;display:flex;gap:10px}
-  .search input{flex:1}
+  .row-actions{display:flex;gap:6px;flex-wrap:wrap}
+  .cust-count{display:inline-flex;align-items:center;gap:6px}
+  .cust-count input{width:60px;padding:4px 6px}
+  .modal-back{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;z-index:100}
+  .modal{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;width:100%;max-width:460px}
+  .modal h3{margin:0 0 14px}
+  .tabs{display:flex;gap:8px;margin-bottom:16px}
+  .tab{padding:8px 14px;border-radius:8px;cursor:pointer;background:transparent;color:var(--muted);border:1px solid var(--border)}
+  .tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -56,10 +61,18 @@
 </div>
 
 <div class="layout">
-  <!-- Form -->
+  <!-- Left: forms -->
   <div>
-    <div class="card">
-      <h2>➕ إضافة شهادة / مشترك جديد</h2>
+    <div class="tabs">
+      <div class="tab active" onclick="showTab('router',this)">إضافة موجه</div>
+      <div class="tab" onclick="showTab('customer',this)">إضافة عميل</div>
+    </div>
+
+    <!-- Router form -->
+    <div class="card" id="tab-router">
+      <h2>➕ إضافة موجه / شهادة</h2>
+      <label>العميل (Customer)</label>
+      <select id="customer_id"><option value="">-- بدون عميل --</option></select>
       <label>اسم الشبكة (Network Name)</label>
       <input id="network_name" placeholder="مثال: cafenet" />
       <div class="form-grid">
@@ -68,15 +81,13 @@
           <input id="network_number" placeholder="مثال: 1" />
         </div>
         <div>
-          <label>RouterOS Major</label>
-          <select id="ros_major"><option value="7">7</option><option value="6">6</option></select>
+          <label>IP المحلي للموجه</label>
+          <input id="hotspot_local_ip" placeholder="192.168.88.1" />
         </div>
       </div>
-      <label>IP المحلي للموجه (Local IP)</label>
-      <input id="hotspot_local_ip" placeholder="192.168.88.1" />
       <label>النطاق الفرعي (Subdomain)</label>
       <input id="hotspot_dns_name" placeholder="hotspot.example.com" />
-      <label>اسم ملف Hotspot Profile</label>
+      <label>ملف Hotspot Profile</label>
       <input id="hotspot_profile" placeholder="hsprof1" />
       <div class="form-grid">
         <div>
@@ -93,32 +104,64 @@
       <button class="btn primary" style="width:100%;margin-top:16px" onclick="addRouter()">حفظ وإضافة تلقائياً</button>
       <div class="msg" id="msg"></div>
       <div id="agentInfo" style="display:none">
-        <label>بيانات الوكيل (Agent) — انسخ إلى الموجه:</label>
+        <label>بيانات الوكيل (Agent):</label>
         <div class="agent-box" id="agentBox"></div>
       </div>
     </div>
+
+    <!-- Customer form -->
+    <div class="card" id="tab-customer" style="display:none">
+      <h2>👤 إضافة عميل</h2>
+      <label>اسم العميل</label>
+      <input id="c_name" placeholder="اسم العميل" />
+      <label>الهاتف</label>
+      <input id="c_phone" placeholder="+964..." />
+      <label>البريد</label>
+      <input id="c_email" placeholder="email@example.com" />
+      <label>عدد الروترات (Routers count)</label>
+      <input id="c_count" type="number" value="1" min="1" />
+      <button class="btn primary" style="width:100%;margin-top:16px" onclick="addCustomer()">حفظ العميل</button>
+      <div class="msg" id="cmsg"></div>
+    </div>
   </div>
 
-  <!-- List -->
+  <!-- Right: lists -->
   <div>
     <div class="stats">
       <div class="stat"><div class="n" id="stTotal">0</div><div class="l">إجمالي الموجهات</div></div>
       <div class="stat"><div class="n" id="stActive">0</div><div class="l">نشطة</div></div>
       <div class="stat"><div class="n" id="stCerts">0</div><div class="l">شهادات صادرة</div></div>
+      <div class="stat"><div class="n" id="stCust">0</div><div class="l">العملاء</div></div>
     </div>
+
+    <!-- Customers -->
+    <div class="card" style="margin-bottom:20px">
+      <h2>👥 العملاء (عدد الروترات)</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>اسم العميل</th><th>الهاتف</th><th>عدد الروترات (قابل للتعديل)</th><th>روترات فعلية</th><th>إجراءات</th></tr></thead>
+          <tbody id="custBody"></tbody>
+        </table>
+        <div class="empty" id="custEmpty" style="display:none">لا توجد عملاء</div>
+      </div>
+    </div>
+
+    <!-- Routers -->
     <div class="card">
-      <h2>📋 المشتركون / الموجهات</h2>
-      <div class="search"><input id="q" placeholder="بحث بالاسم أو IP أو النطاق..." oninput="render()" /></div>
+      <h2>📋 الموجهات / المشتركون</h2>
+      <div class="search"><input id="q" placeholder="بحث بالاسم أو IP أو النطاق..." oninput="renderRouters()" /></div>
       <div class="table-wrap">
         <table>
           <thead><tr>
-            <th>اسم الشبكة</th><th>رقم</th><th>IP</th><th>النطاق</th><th>المالك</th><th>الهاتف</th><th>ROS</th><th>الحالة</th><th>إجراءات</th>
+            <th>اسم الشبكة</th><th>رقم</th><th>IP</th><th>النطاق</th><th>العميل</th><th>المالك</th><th>الهاتف</th><th>ROS</th><th>الحالة</th><th>شهادة/سكربت</th>
           </tr></thead>
           <tbody id="tbody"></tbody>
         </table>
         <div class="empty" id="empty" style="display:none">لا توجد بيانات</div>
       </div>
     </div>
+
+    <!-- Certs -->
     <div class="card" style="margin-top:20px">
       <h2>📜 الشهادات</h2>
       <div class="table-wrap">
@@ -136,20 +179,146 @@
 const token=localStorage.getItem('token');
 if(!token){ location.href='/login'; }
 const H={'Authorization':'Bearer '+token,'Content-Type':'application/json'};
-let routers=[];
+let routers=[]; let customers=[];
 
 function logout(){ localStorage.removeItem('token'); location.href='/login'; }
-
 async function api(path,opts){ const r=await fetch(path,{...(opts||{}),headers:{...H,...(opts?.headers||{})}}); const t=await r.text(); let d; try{d=JSON.parse(t)}catch{d=t} if(!r.ok) throw new Error(d.error||r.statusText); return d; }
+
+function showTab(name,el){
+  document.getElementById('tab-router').style.display = name==='router'?'block':'none';
+  document.getElementById('tab-customer').style.display = name==='customer'?'block':'none';
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+}
 
 async function load(){
   try{
+    customers=await api('/api/customers');
     routers=await api('/api/routers');
     document.getElementById('user').textContent='admin@alnooah.pro';
-    render();
-    loadCertsCount();
-    loadCertsTable();
+    renderCustomers(); renderRouters(); loadCertsCount(); loadCertsTable();
+    populateCustomerSelect();
   }catch(e){ if(e.message.includes('401')||e.message.includes('unauthorized')){localStorage.removeItem('token');location.href='/login';} }
+}
+
+function populateCustomerSelect(){
+  const sel=document.getElementById('customer_id');
+  const cur=sel.value;
+  sel.innerHTML='<option value="">-- بدون عميل --</option>';
+  customers.forEach(c=>{ const o=document.createElement('option'); o.value=c.id; o.textContent=c.name+' ('+c.router_count+')'; sel.appendChild(o); });
+  sel.value=cur;
+}
+
+function renderCustomers(){
+  const tb=document.getElementById('custBody'); tb.innerHTML='';
+  if(customers.length===0){ document.getElementById('custEmpty').style.display='block'; }
+  else { document.getElementById('custEmpty').style.display='none'; }
+  customers.forEach(c=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td><strong>${esc(c.name)}</strong></td>
+      <td>${esc(c.phone||'-')}</td>
+      <td><div class="cust-count"><input type="number" min="1" value="${c.router_count}" onchange="updateCount('${c.id}',this.value)" /> <button class="btn sm ghost" onclick="saveCount('${c.id}',this)">حفظ</button></div></td>
+      <td>${esc(c.actual_routers||0)}</td>
+      <td><button class="btn sm danger" onclick="delCustomer('${c.id}')">حذف</button></td>`;
+    tb.appendChild(tr);
+  });
+  document.getElementById('stCust').textContent=customers.length;
+}
+
+async function updateCount(id,val){ /* placeholder */ }
+async function saveCount(id,btn){
+  const input=btn.parentElement.querySelector('input');
+  try{ await api('/api/customers/'+id,{method:'PATCH',body:JSON.stringify({router_count:parseInt(input.value,10)})}); load(); }catch(e){ alert('خطأ: '+e.message); }
+}
+async function delCustomer(id){ if(!confirm('حذف العميل؟')) return; try{ await api('/api/customers/'+id,{method:'DELETE'}); load(); }catch(e){ alert('خطأ: '+e.message); } }
+
+async function addCustomer(){
+  const msg=document.getElementById('cmsg'); msg.textContent=''; msg.className='msg';
+  const body={ name: document.getElementById('c_name').value.trim(), phone: document.getElementById('c_phone').value.trim(), email: document.getElementById('c_email').value.trim(), router_count: parseInt(document.getElementById('c_count').value,10)||1 };
+  if(!body.name){ msg.textContent='اسم العميل مطلوب'; msg.className='msg err'; return; }
+  try{ await api('/api/customers',{method:'POST',body:JSON.stringify(body)}); msg.textContent='تم حفظ العميل ✅'; msg.className='msg ok'; ['c_name','c_phone','c_email'].forEach(id=>document.getElementById(id).value=''); document.getElementById('c_count').value=1; load(); }catch(e){ msg.textContent='خطأ: '+e.message; msg.className='msg err'; }
+}
+
+function renderRouters(){
+  const q=document.getElementById('q').value.toLowerCase();
+  const filtered=routers.filter(r=> (r.network_name||r.router_name||'').toLowerCase().includes(q) || (r.hotspot_local_ip||'').toLowerCase().includes(q) || (r.hotspot_dns_name||'').toLowerCase().includes(q) || (r.customer_name||r.customer_name_full||'').toLowerCase().includes(q));
+  const tb=document.getElementById('tbody');
+  tb.innerHTML='';
+  if(filtered.length===0){ document.getElementById('empty').style.display='block'; }
+  else { document.getElementById('empty').style.display='none'; }
+  filtered.forEach(r=>{
+    const tr=document.createElement('tr');
+    const cust = customers.find(c=>c.id===r.customer_id);
+    tr.innerHTML=`
+      <td><strong>${esc(r.network_name||r.router_name||'-')}</strong></td>
+      <td>${esc(r.network_number||'-')}</td>
+      <td>${esc(r.hotspot_local_ip)}</td>
+      <td>${esc(r.hotspot_dns_name)}</td>
+      <td>${esc(cust?.name||r.customer_name||'-')}</td>
+      <td>${esc(r.customer_name||'-')}</td>
+      <td>${esc(r.phone||'-')}</td>
+      <td><select onchange="setRos('${r.id}',this.value)" style="width:70px;padding:4px">
+        <option value="" ${!r.ros_major?'selected':''}>-</option>
+        <option value="6" ${r.ros_major==6?'selected':''}>6</option>
+        <option value="7" ${r.ros_major==7?'selected':''}>7</option>
+      </select></td>
+      <td><span class="badge ${r.status==='active'?'active':'pending'}">${esc(r.status)}</span></td>
+      <td><div class="row-actions">
+        <button class="btn sm ghost" onclick="genScript('${r.id}',6)">سكربت v6</button>
+        <button class="btn sm ghost" onclick="genScript('${r.id}',7)">سكربت v7</button>
+        <button class="btn sm ghost" onclick="viewAgent('${r.id}')">وكيل</button>
+      </div></td>`;
+    tb.appendChild(tr);
+  });
+  document.getElementById('stTotal').textContent=routers.length;
+  document.getElementById('stActive').textContent=routers.filter(r=>r.status==='active').length;
+}
+
+async function setRos(id,val){
+  try{ await api('/api/routers/'+id,{method:'PATCH',body:JSON.stringify({ros_major: val?parseInt(val,10):null})}); }catch(e){ alert('خطأ: '+e.message); }
+}
+
+function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function addRouter(){
+  const msg=document.getElementById('msg'); msg.textContent=''; msg.className='msg';
+  const body={
+    customer_id: document.getElementById('customer_id').value || null,
+    network_name: document.getElementById('network_name').value.trim(),
+    network_number: document.getElementById('network_number').value.trim(),
+    hotspot_local_ip: document.getElementById('hotspot_local_ip').value.trim(),
+    hotspot_dns_name: document.getElementById('hotspot_dns_name').value.trim(),
+    hotspot_profile: document.getElementById('hotspot_profile').value.trim()||'hsprof1',
+    owner_name: document.getElementById('owner_name').value.trim(),
+    owner_phone: document.getElementById('owner_phone').value.trim(),
+    subscription_months: parseInt(document.getElementById('subscription_months').value,10)||1,
+  };
+  if(!body.network_name||!body.hotspot_local_ip||!body.hotspot_dns_name){ msg.textContent='يرجى تعبئة الحقول المطلوبة (اسم الشبكة، IP، النطاق)'; msg.className='msg err'; return; }
+  try{
+    const res=await api('/api/routers',{method:'POST',body:JSON.stringify(body)});
+    routers.unshift(res.router);
+    renderRouters();
+    msg.textContent='تمت الإضافة بنجاح ✅'; msg.className='msg ok';
+    const info=document.getElementById('agentInfo'); info.style.display='block';
+    document.getElementById('agentBox').textContent=`URL Token: ${res.agent.url_token}\nAgent User: ${res.agent.agent_user}\nAgent Secret: ${res.agent.agent_secret}\nBase: https://${location.hostname}/agent/v1/${res.agent.url_token}/`;
+    ['network_name','network_number','hotspot_local_ip','hotspot_dns_name','owner_name','owner_phone'].forEach(id=>document.getElementById(id).value='');
+  }catch(e){ msg.textContent='خطأ: '+e.message; msg.className='msg err'; }
+}
+
+async function viewAgent(id){
+  try{
+    const c=await api('/api/routers/'+id+'/agent');
+    alert(`URL Token: ${c.url_token}\nAgent User: ${c.agent_user}\nAgent Secret: ${c.agent_secret}\nBase: https://${location.hostname}/agent/v1/${c.url_token}/`);
+  }catch(e){ alert('خطأ: '+e.message); }
+}
+
+async function genScript(id,ros){
+  try{
+    const r=await fetch('/api/routers/'+id+'/script?ros='+ros,{headers:H});
+    const t=await r.text();
+    const w=window.open('','_blank');
+    w.document.write('<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;background:#0b1220;color:#e6edf7">'+t.replace(/</g,'&lt;')+'</pre>');
+  }catch(e){ alert('خطأ: '+e.message); }
 }
 
 async function loadCertsCount(){
@@ -168,69 +337,6 @@ async function loadCertsTable(){
       tb.appendChild(tr);
     });
   }catch{}
-}
-
-function render(){
-  const q=document.getElementById('q').value.toLowerCase();
-  const filtered=routers.filter(r=> (r.network_name||r.router_name||'').toLowerCase().includes(q) || (r.hotspot_local_ip||'').toLowerCase().includes(q) || (r.hotspot_dns_name||'').toLowerCase().includes(q) || (r.customer_name||'').toLowerCase().includes(q));
-  const tb=document.getElementById('tbody');
-  tb.innerHTML='';
-  if(filtered.length===0){ document.getElementById('empty').style.display='block'; }
-  else { document.getElementById('empty').style.display='none'; }
-  filtered.forEach(r=>{
-    const tr=document.createElement('tr');
-    tr.innerHTML=`
-      <td><strong>${esc(r.network_name||r.router_name||'-')}</strong></td>
-      <td>${esc(r.network_number||'-')}</td>
-      <td>${esc(r.hotspot_local_ip)}</td>
-      <td>${esc(r.hotspot_dns_name)}</td>
-      <td>${esc(r.customer_name||'-')}</td>
-      <td>${esc(r.phone||'-')}</td>
-      <td>${esc(r.ros_major)}</td>
-      <td><span class="badge ${r.status==='active'?'active':'pending'}">${esc(r.status)}</span></td>
-      <td><div class="row-actions">
-        <button class="icon-btn" onclick="viewAgent('${r.id}')">وكيل</button>
-      </div></td>`;
-    tb.appendChild(tr);
-  });
-  document.getElementById('stTotal').textContent=routers.length;
-  document.getElementById('stActive').textContent=routers.filter(r=>r.status==='active').length;
-}
-
-function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-async function addRouter(){
-  const msg=document.getElementById('msg'); msg.textContent=''; msg.className='msg';
-  const body={
-    network_name: document.getElementById('network_name').value.trim(),
-    network_number: document.getElementById('network_number').value.trim(),
-    ros_major: parseInt(document.getElementById('ros_major').value,10),
-    hotspot_local_ip: document.getElementById('hotspot_local_ip').value.trim(),
-    hotspot_dns_name: document.getElementById('hotspot_dns_name').value.trim(),
-    hotspot_profile: document.getElementById('hotspot_profile').value.trim()||'hsprof1',
-    owner_name: document.getElementById('owner_name').value.trim(),
-    owner_phone: document.getElementById('owner_phone').value.trim(),
-    subscription_months: parseInt(document.getElementById('subscription_months').value,10)||1,
-  };
-  if(!body.network_name||!body.hotspot_local_ip||!body.hotspot_dns_name){ msg.textContent='يرجى تعبئة الحقول المطلوبة (اسم الشبكة، IP، النطاق)'; msg.className='msg err'; return; }
-  try{
-    const res=await api('/api/routers',{method:'POST',body:JSON.stringify(body)});
-    routers.unshift(res.router);
-    render();
-    loadCertsTable();
-    msg.textContent='تمت الإضافة بنجاح ✅'; msg.className='msg ok';
-    const info=document.getElementById('agentInfo'); info.style.display='block';
-    document.getElementById('agentBox').textContent=`URL Token: ${res.agent.url_token}\nAgent User: ${res.agent.agent_user}\nAgent Secret: ${res.agent.agent_secret}\nBase: https://${location.hostname}/agent/v1/${res.agent.url_token}/`;
-    // reset
-    ['network_name','network_number','hotspot_local_ip','hotspot_dns_name','owner_name','owner_phone'].forEach(id=>document.getElementById(id).value='');
-  }catch(e){ msg.textContent='خطأ: '+e.message; msg.className='msg err'; }
-}
-
-async function viewAgent(id){
-  try{
-    const c=await api('/api/routers/'+id+'/agent');
-    alert(`URL Token: ${c.url_token}\nAgent User: ${c.agent_user}\nAgent Secret: ${c.agent_secret}\nBase: https://${location.hostname}/agent/v1/${c.url_token}/`);
-  }catch(e){ alert('خطأ: '+e.message); }
 }
 
 load();

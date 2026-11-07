@@ -7,16 +7,18 @@ const router = Router();
 router.use(authMiddleware);
 
 router.get('/', async (_req, res) => {
-  const rows = await query('SELECT * FROM routers ORDER BY created_at DESC');
+  const rows = await query(`SELECT r.*, c.name AS customer_name_full FROM routers r LEFT JOIN customers c ON c.id=r.customer_id ORDER BY r.created_at DESC`);
   res.json(rows);
 });
 
 router.post('/', async (req, res) => {
   const b = req.body || {};
   const rows = await query(
-    `INSERT INTO routers(customer_name,phone,email,router_name,ros_major,hotspot_profile,hotspot_local_ip,hotspot_dns_name,subscription_months,network_name,network_number)
-     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING *`,
-    [b.owner_name || b.customer_name, b.owner_phone || b.phone, b.email, b.network_name || b.router_name, b.ros_major || 7, b.hotspot_profile, b.hotspot_local_ip, b.hotspot_dns_name, b.subscription_months || 1, b.network_name, b.network_number]
+    `INSERT INTO routers(customer_id,customer_name,phone,email,router_name,ros_major,hotspot_profile,hotspot_local_ip,hotspot_dns_name,subscription_months,network_name,network_number)
+     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+    [b.customer_id || null, b.owner_name || b.customer_name || null, b.owner_phone || b.phone || null, b.email || null,
+     b.network_name || b.router_name || 'router', b.ros_major || null, b.hotspot_profile, b.hotspot_local_ip, b.hotspot_dns_name,
+     b.subscription_months || 1, b.network_name || b.router_name, b.network_number || null]
   );
   const r = rows[0];
   const url_token = generateUrlToken();
@@ -24,6 +26,31 @@ router.post('/', async (req, res) => {
   const agent_secret = generateAgentSecret();
   await query('INSERT INTO agent_credentials(router_id,url_token,agent_user,agent_secret,reveal_until) VALUES($1,$2,$3,$4,now()+interval \'24 hours\')', [r.id, url_token, agent_user, agent_secret]);
   res.json({ router: r, agent: { url_token, agent_user, agent_secret } });
+});
+
+router.patch('/:id', async (req, res) => {
+  const b = req.body || {};
+  const row = await one(
+    `UPDATE routers SET
+       customer_id=COALESCE($1,customer_id),
+       customer_name=COALESCE($2,customer_name),
+       phone=COALESCE($3,phone),
+       email=COALESCE($4,email),
+       router_name=COALESCE($5,router_name),
+       ros_major=COALESCE($6,ros_major),
+       hotspot_profile=COALESCE($7,hotspot_profile),
+       hotspot_local_ip=COALESCE($8,hotspot_local_ip),
+       hotspot_dns_name=COALESCE($9,hotspot_dns_name),
+       subscription_months=COALESCE($10,subscription_months),
+       network_name=COALESCE($11,network_name),
+       network_number=COALESCE($12,network_number),
+       status=COALESCE($13,status),
+       updated_at=now()
+     WHERE id=$14 RETURNING *`,
+    [b.customer_id, b.owner_name || b.customer_name, b.owner_phone || b.phone, b.email, b.network_name || b.router_name,
+     b.ros_major, b.hotspot_profile, b.hotspot_local_ip, b.hotspot_dns_name, b.subscription_months, b.network_name, b.network_number, b.status, req.params.id]
+  );
+  res.json(row);
 });
 
 router.get('/:id', async (req, res) => {
@@ -36,6 +63,35 @@ router.get('/:id/agent', async (req, res) => {
   const cred = await one('SELECT url_token, agent_user, agent_secret, reveal_until FROM agent_credentials WHERE router_id=$1', [req.params.id]);
   if (!cred) return res.status(404).json({ error: 'not found' });
   res.json(cred);
+});
+
+// Generate RouterOS script for v6 or v7
+router.get('/:id/script', async (req, res) => {
+  const ros = String(req.query.ros || '7');
+  const r = await one('SELECT * FROM routers WHERE id=$1', [req.params.id]);
+  if (!r) return res.status(404).json({ error: 'not found' });
+  const cred = await one('SELECT url_token, agent_user, agent_secret FROM agent_credentials WHERE router_id=$1', [req.params.id]);
+  const agent_host = process.env.AGENT_HOST || 'hotspotmikrotik.alnooah.pro';
+  const base = `https://${agent_host}/agent/v1/${cred.url_token}`;
+  const ver = ros === '6' ? '6' : '7';
+  const script = `# hs-cert bootstrap - ${r.router_name} - ROS ${ver}
+# 1) DNS static
+/ip dns static add name=${r.hotspot_dns_name} address=${r.hotspot_local_ip} type=A comment="hs-cert"
+
+# 2) Hotspot profile
+/ip hotspot profile set [find where name=${r.hotspot_profile}] dns-name=${r.hotspot_dns_name} login-by=https,http-chap
+${ros === '6' ? '/ip hotspot profile set [find where name=' + r.hotspot_profile + '] https-redirect=no' : ''}
+
+# 3) Agent fetch credentials (keep secret)
+# base=${base}
+# user=${cred.agent_user}
+# pass=${cred.agent_secret}
+
+# 4) Import script hs-cert-update (see docs) and run once.
+# version check:
+# /tool fetch url=${base}/version.txt user=${cred.agent_user} password=${cred.agent_secret} check-certificate=yes dst-path=hs-ver.txt
+`;
+  res.type('text/plain').send(script);
 });
 
 export default router;
