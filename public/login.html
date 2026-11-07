@@ -29,6 +29,9 @@
     <input id="email" type="email" autocomplete="username" />
     <label>كلمة المرور</label>
     <input id="password" type="password" autocomplete="current-password" />
+    <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;color:var(--text)">
+      <input id="remember" type="checkbox" style="width:auto;margin:0" /> تذكرني (30 يوم)
+    </label>
     <button onclick="login()">دخول</button>
     <div class="err" id="err"></div>
   </div>
@@ -36,7 +39,7 @@
 async function login(){
   const err=document.getElementById('err'); err.textContent='';
   try{
-    const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email.value,password:password.value}),credentials:'include'});
+    const r=await fetch('/api/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:email.value,password:password.value,remember:remember.checked}),credentials:'include'});
     const d=await r.json();
     if(!r.ok){ err.textContent=d.error||'فشل الدخول'; return; }
     localStorage.setItem('token',d.token);
