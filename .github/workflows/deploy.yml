@@ -1,0 +1,26 @@
+name: Deploy to Coolify
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Coolify deploy
+        env:
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_BASE: ${{ secrets.COOLIFY_BASE }}
+          APP_UUID: ${{ secrets.COOLIFY_APP_UUID }}
+        run: |
+          curl -sS -X POST "$COOLIFY_BASE/api/v1/applications/$APP_UUID/start" \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            -H "Content-Type: application/json"
+      - name: Wait and verify
+        env:
+          BASE_URL: ${{ secrets.BASE_URL }}
+          ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          sleep 90
+          node scripts/verify.js
