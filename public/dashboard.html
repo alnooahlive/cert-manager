@@ -161,6 +161,24 @@
   </div>
 </div>
 
+<!-- Script modal -->
+<div class="modal-back" id="scriptModal">
+  <div class="modal" style="max-width:720px">
+    <h3>📜 سكربت Mikrotik RouterOS</h3>
+    <div class="tabs" style="margin-bottom:10px">
+      <div class="tab active" onclick="showScriptTab('allInOne',this)">الكل (All-in-one)</div>
+      <div class="tab" onclick="showScriptTab('bootstrap',this)">Bootstrap</div>
+      <div class="tab" onclick="showScriptTab('update',this)">Update</div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:10px">
+      <select id="scriptRos" style="width:120px" onchange="loadScripts()"><option value="7">ROS 7</option><option value="6">ROS 6</option></select>
+      <button class="btn primary sm" onclick="copyScript()">📋 نسخ</button>
+      <button class="btn ghost sm" onclick="closeScriptModal()">إغلاق</button>
+    </div>
+    <textarea id="scriptText" readonly style="width:100%;height:320px;background:#0b1220;color:#e6edf7;border:1px solid var(--border);border-radius:9px;padding:12px;font-family:monospace;font-size:12px"></textarea>
+    <div class="msg" id="scriptMsg"></div>
+  </div>
+</div>
 <script>
 const token=localStorage.getItem('token');
 if(!token){ location.href='/login'; }
@@ -301,14 +319,32 @@ async function viewAgent(id){
   }catch(e){ alert('خطأ: '+e.message); }
 }
 
+let currentScriptId=null; let currentScripts=null; let currentScriptTab='allInOne';
 async function genScript(id,ros){
-  try{
-    const r=await fetch('/api/routers/'+id+'/script?ros='+ros,{headers:H});
-    const t=await r.text();
-    const w=window.open('','_blank');
-    w.document.write('<pre style="white-space:pre-wrap;font-family:monospace;padding:20px;background:#0b1220;color:#e6edf7">'+t.replace(/</g,'&lt;')+'</pre>');
-  }catch(e){ alert('خطأ: '+e.message); }
+  currentScriptId=id;
+  document.getElementById('scriptRos').value=ros||7;
+  await loadScripts();
+  document.getElementById('scriptModal').style.display='flex';
 }
+async function loadScripts(){
+  const ros=document.getElementById('scriptRos').value;
+  const r=await fetch('/api/routers/'+currentScriptId+'/scripts?ros='+ros,{headers:H});
+  if(!r.ok){ document.getElementById('scriptMsg').textContent='خطأ: '+r.statusText; return; }
+  currentScripts=await r.json();
+  showScriptTab(currentScriptTab,null);
+  // auto-copy
+  try{ await navigator.clipboard.writeText(currentScripts[currentScriptTab]); document.getElementById('scriptMsg').textContent='✅ تم إنشاء السكربت ونسخه تلقائياً'; document.getElementById('scriptMsg').className='msg ok'; }catch(e){ document.getElementById('scriptMsg').textContent='تم الإنشاء (انسخ يدوياً)'; }
+}
+function showScriptTab(tab,el){
+  currentScriptTab=tab;
+  if(currentScripts) document.getElementById('scriptText').value=currentScripts[tab]||'';
+  document.querySelectorAll('#scriptModal .tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+}
+async function copyScript(){
+  try{ await navigator.clipboard.writeText(document.getElementById('scriptText').value); document.getElementById('scriptMsg').textContent='✅ تم النسخ'; document.getElementById('scriptMsg').className='msg ok'; }catch(e){ document.getElementById('scriptMsg').textContent='فشل النسخ، انسخ يدوياً'; document.getElementById('scriptMsg').className='msg err'; }
+}
+function closeScriptModal(){ document.getElementById('scriptModal').style.display='none'; }
 
 async function loadCertsCount(){
   try{ const c=await api('/api/certificates'); document.getElementById('stCerts').textContent=c.filter(x=>x.status==='issued').length; }catch{}

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { query, one } from '../db';
 import { authMiddleware } from '../auth';
 import { generateUrlToken, generateAgentSecret } from '../acme';
+import { bootstrapScript, updateScript, allInOne, ScriptContext } from '../scripts';
 
 const router = Router();
 router.use(authMiddleware);
@@ -75,7 +76,34 @@ router.get('/:id/agent', async (req, res) => {
   res.json(cred);
 });
 
-// Generate RouterOS script for v6 or v7
+// Generate RouterOS scripts (bootstrap + update + all-in-one) for v6 or v7
+router.get('/:id/scripts', async (req, res) => {
+  const ros = parseInt(String(req.query.ros || '7'), 10) === 6 ? 6 : 7;
+  const r = await one('SELECT * FROM routers WHERE id=$1', [req.params.id]);
+  if (!r) return res.status(404).json({ error: 'not found' });
+  const cred = await one('SELECT url_token, agent_user, agent_secret FROM agent_credentials WHERE router_id=$1', [req.params.id]);
+  if (!cred) return res.status(404).json({ error: 'agent not found' });
+  const ctx: ScriptContext = {
+    router_name: r.network_name || r.router_name || 'router',
+    ros_major: ros,
+    hotspot_profile: r.hotspot_profile,
+    hotspot_dns_name: r.hotspot_dns_name,
+    hotspot_local_ip: r.hotspot_local_ip,
+    agent_host: process.env.AGENT_HOST || 'hotspotmikrotik.alnooah.pro',
+    url_token: cred.url_token,
+    agent_user: cred.agent_user,
+    agent_secret: cred.agent_secret,
+    template_version: '1',
+  };
+  res.json({
+    ros,
+    bootstrap: bootstrapScript(ctx),
+    update: updateScript(ctx),
+    allInOne: allInOne(ctx),
+  });
+});
+
+// (legacy) single script
 router.get('/:id/script', async (req, res) => {
   const ros = String(req.query.ros || '7');
   const r = await one('SELECT * FROM routers WHERE id=$1', [req.params.id]);
