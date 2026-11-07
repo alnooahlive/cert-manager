@@ -5,47 +5,70 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>لوحة التحكم — مدير الشهادات</title>
 <link rel="icon" href="/favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
 <style>
-  :root{--bg:#0b1220;--panel:#111a2e;--card:#16203a;--border:#24324f;--text:#e6edf7;--muted:#8fa3c4;--accent:#3b82f6;--accent2:#8b5cf6;--ok:#22c55e;--warn:#f59e0b;--danger:#ef4444}
+  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
+  :root{
+    --bg:#080e1a;--bg2:#0d1526;--panel:#111a2e;--card:#131f38;--border:#1f2d4a;--text:#e8eef9;--muted:#7e93b8;--accent:#4f8cff;--accent2:#9b6bff;--ok:#34d399;--warn:#fbbf24;--danger:#f87171;--shadow:0 10px 40px rgba(0,0,0,.35);
+  }
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--text);font-family:'Segoe UI',Tahoma,Arial,sans-serif;min-height:100vh}
-  .topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 28px;background:linear-gradient(180deg,#111a2e,#0b1220);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:10}
-  .topbar h1{margin:0;font-size:20px;display:flex;align-items:center;gap:10px}
-  .topbar .dot{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px}
-  .btn{padding:9px 16px;border-radius:9px;border:none;cursor:pointer;font-weight:600;font-size:14px}
-  .btn.primary{background:var(--accent);color:#fff}
+  body{margin:0;background:radial-gradient(1200px 800px at 20% -10%,#1e3a8a22,transparent),radial-gradient(900px 600px at 90% 10%,#6d28d91a,transparent),var(--bg);color:var(--text);font-family:'Tajawal',sans-serif;min-height:100vh;font-size:15px}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 28px;background:rgba(13,21,38,.7);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20}
+  .topbar h1{margin:0;font-size:20px;display:flex;align-items:center;gap:12px;font-weight:800}
+  .topbar .dot{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;box-shadow:0 4px 14px #4f8cff55}
+  .btn{padding:9px 16px;border-radius:10px;border:none;cursor:pointer;font-weight:600;font-size:14px;transition:all .18s ease;font-family:inherit}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 4px 14px #4f8cff44}
+  .btn.primary:hover{transform:translateY(-1px);box-shadow:0 6px 18px #4f8cff66}
   .btn.ghost{background:transparent;color:var(--muted);border:1px solid var(--border)}
-  .btn.danger{background:var(--danger);color:#fff}
-  .btn.sm{padding:6px 10px;font-size:12px}
+  .btn.ghost:hover{color:var(--text);border-color:var(--accent)}
+  .btn.danger{background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff}
+  .btn.sm{padding:5px 10px;font-size:12px;border-radius:8px}
   .layout{display:grid;grid-template-columns:360px 1fr;gap:22px;padding:24px 28px;max-width:1500px;margin:0 auto}
   @media(max-width:1000px){.layout{grid-template-columns:1fr}}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:22px;margin-bottom:20px}
-  .card h2{margin:0 0 16px;font-size:17px;display:flex;align-items:center;gap:8px}
-  label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px;font-weight:600}
-  input,select{width:100%;padding:11px 13px;border-radius:9px;border:1px solid var(--border);background:#0b1220;color:var(--text);font-size:14px}
-  input:focus,select:focus{outline:none;border-color:var(--accent)}
+  .card{background:linear-gradient(180deg,rgba(19,31,56,.9),rgba(13,21,38,.9));border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:20px;box-shadow:var(--shadow);animation:fadeIn .4s ease}
+  .card h2{margin:0 0 16px;font-size:17px;display:flex;align-items:center;gap:8px;font-weight:700}
+  label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px;font-weight:600;letter-spacing:.3px}
+  input,select{width:100%;padding:11px 13px;border-radius:10px;border:1px solid var(--border);background:rgba(8,14,26,.6);color:var(--text);font-size:14px;font-family:inherit;transition:border-color .18s}
+  input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #4f8cff22}
   .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
   .msg{margin-top:12px;font-size:13px;min-height:18px}
   .msg.ok{color:var(--ok)} .msg.err{color:var(--danger)}
   .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
-  .stat{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px}
-  .stat .n{font-size:26px;font-weight:700}
+  .stat{background:linear-gradient(135deg,rgba(79,140,255,.12),rgba(155,107,255,.08));border:1px solid var(--border);border-radius:14px;padding:16px;transition:transform .18s}
+  .stat:hover{transform:translateY(-2px)}
+  .stat .n{font-size:28px;font-weight:800;background:linear-gradient(135deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;color:transparent}
   .stat .l{color:var(--muted);font-size:12px;margin-top:2px}
-  .table-wrap{overflow:auto}
-  table{width:100%;border-collapse:collapse;font-size:13px}
+  .table-wrap{overflow:auto;border-radius:10px}
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
   th,td{padding:12px 10px;text-align:right;border-bottom:1px solid var(--border)}
-  th{color:var(--muted);font-weight:600;font-size:12px;background:#0e1628;position:sticky;top:0}
-  tr:hover td{background:#0e1628}
-  .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:600}
-  .badge.active{background:#14532d;color:#86efac}
-  .badge.pending{background:#78350f;color:#fcd34d}
-  .empty{padding:30px;text-align:center;color:var(--muted)}
-  .agent-box{background:#0b1220;border:1px dashed var(--border);border-radius:9px;padding:10px;margin-top:8px;font-family:monospace;font-size:12px;word-break:break-all;color:#93c5fd}
+  th{color:var(--muted);font-weight:700;font-size:11px;background:rgba(14,22,40,.9);position:sticky;top:0;text-transform:uppercase;letter-spacing:.5px}
+  tr:hover td{background:rgba(79,140,255,.05)}
+  .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:700}
+  .badge.active{background:rgba(52,211,153,.15);color:var(--ok)}
+  .badge.pending{background:rgba(251,191,36,.15);color:var(--warn)}
+  .empty{padding:40px;text-align:center;color:var(--muted);font-size:14px}
+  .empty .icon{font-size:36px;margin-bottom:8px;opacity:.5}
+  .agent-box{background:rgba(8,14,26,.7);border:1px dashed var(--border);border-radius:10px;padding:12px;margin-top:8px;font-family:'Consolas',monospace;font-size:12px;word-break:break-all;color:#93c5fd;line-height:1.7}
   .row-actions{display:flex;gap:6px;flex-wrap:wrap}
   .cust-count{display:inline-flex;align-items:center;gap:6px}
   .cust-count input{width:60px;padding:4px 6px}
-  .search{margin-bottom:14px}
   .search input{width:100%}
+  .modal-back{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center;z-index:100;animation:fadeIn .2s}
+  .modal{background:linear-gradient(180deg,var(--card),var(--panel));border:1px solid var(--border);border-radius:18px;padding:24px;width:100%;max-width:760px;box-shadow:0 20px 60px #0008;animation:slideUp .25s}
+  .modal h3{margin:0 0 14px;font-weight:700}
+  .tabs{display:flex;gap:8px;margin-bottom:14px}
+  .tab{padding:8px 14px;border-radius:9px;cursor:pointer;background:transparent;color:var(--muted);border:1px solid var(--border);font-family:inherit;font-weight:600;font-size:13px;transition:all .18s}
+  .tab.active{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--panel);border:1px solid var(--border);padding:12px 20px;border-radius:12px;box-shadow:var(--shadow);z-index:200;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;font-weight:600}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(-6px)}
+  .toast.ok{border-color:var(--ok);color:var(--ok)}
+  .toast.err{border-color:var(--danger);color:var(--danger)}
+  .spinner{display:inline-block;width:16px;height:16px;border:2px solid #ffffff44;border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;margin-left:6px}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .dns-hint{font-size:12px;color:var(--muted);margin-top:4px}
+  .dns-hint span{color:#93c5fd;font-weight:600}
 </style>
 </head>
 <body>
@@ -53,7 +76,7 @@
   <h1><div class="dot">SSL</div> مدير الشهادات — Mikrotik Hotspot</h1>
   <div style="display:flex;gap:10px;align-items:center">
     <span id="user" style="color:var(--muted);font-size:13px"></span>
-    <button class="btn ghost" onclick="logout()">تسجيل الخروج</button>
+    <button class="btn ghost sm" onclick="logout()">تسجيل الخروج</button>
   </div>
 </div>
 
@@ -98,7 +121,7 @@
       </div>
       <label>النطاق الفرعي (prefix فقط)</label>
       <input id="hotspot_dns_name" placeholder="cafe" oninput="updateDnsHint()" />
-      <div style="font-size:12px;color:var(--muted);margin-top:4px">النتيجة: <span id="dnsHint" style="color:#93c5fd"></span></div>
+      <div class="dns-hint">النتيجة: <span id="dnsHint"></span></div>
       <label>ملف Hotspot Profile</label>
       <input id="hotspot_profile" placeholder="hsprof1" />
       <label>مدة الاشتراك (أشهر)</label>
@@ -132,7 +155,6 @@
       <div class="stat"><div class="n" id="stCust">0</div><div class="l">العملاء</div></div>
     </div>
 
-    <!-- Customers -->
     <div class="card">
       <h2>👥 العملاء (عدد الروترات)</h2>
       <div class="table-wrap">
@@ -140,11 +162,10 @@
           <thead><tr><th>اسم العميل</th><th>الهاتف</th><th>عدد الروترات (قابل للتعديل)</th><th>روترات فعلية</th><th>إجراءات</th></tr></thead>
           <tbody id="custBody"></tbody>
         </table>
-        <div class="empty" id="custEmpty" style="display:none">لا توجد عملاء</div>
+        <div class="empty" id="custEmpty" style="display:none"><div class="icon">👥</div>لا توجد عملاء</div>
       </div>
     </div>
 
-    <!-- Routers -->
     <div class="card">
       <h2>📋 الموجهات</h2>
       <div class="search"><input id="q" placeholder="بحث بالاسم أو IP أو النطاق..." oninput="renderRouters()" /></div>
@@ -155,11 +176,10 @@
           </tr></thead>
           <tbody id="tbody"></tbody>
         </table>
-        <div class="empty" id="empty" style="display:none">لا توجد بيانات</div>
+        <div class="empty" id="empty" style="display:none"><div class="icon">📡</div>لا توجد بيانات</div>
       </div>
     </div>
 
-    <!-- Certs -->
     <div class="card">
       <h2>📜 الشهادات</h2>
       <div class="table-wrap">
@@ -167,7 +187,7 @@
           <thead><tr><th>الموجه</th><th>الإصدار</th><th>الحالة</th><th>تنتهي في</th><th>المصدر</th><th>التجديد</th><th>إجراءات</th></tr></thead>
           <tbody id="certsBody"></tbody>
         </table>
-        <div class="empty" id="certsEmpty" style="display:none">لا توجد شهادات</div>
+        <div class="empty" id="certsEmpty" style="display:none"><div class="icon">📜</div>لا توجد شهادات</div>
       </div>
     </div>
   </div>
@@ -175,22 +195,25 @@
 
 <!-- Script modal -->
 <div class="modal-back" id="scriptModal">
-  <div class="modal" style="max-width:720px">
+  <div class="modal">
     <h3>📜 سكربت Mikrotik RouterOS</h3>
     <div class="tabs" style="margin-bottom:10px">
       <div class="tab active" onclick="showScriptTab('allInOne',this)">الكل (All-in-one)</div>
       <div class="tab" onclick="showScriptTab('bootstrap',this)">Bootstrap</div>
       <div class="tab" onclick="showScriptTab('update',this)">Update</div>
     </div>
-    <div style="display:flex;gap:8px;margin-bottom:10px">
+    <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center">
       <select id="scriptRos" style="width:120px" onchange="loadScripts()"><option value="7">ROS 7</option><option value="6">ROS 6</option></select>
       <button class="btn primary sm" onclick="copyScript()">📋 نسخ</button>
       <button class="btn ghost sm" onclick="closeScriptModal()">إغلاق</button>
     </div>
-    <textarea id="scriptText" readonly style="width:100%;height:320px;background:#0b1220;color:#e6edf7;border:1px solid var(--border);border-radius:9px;padding:12px;font-family:monospace;font-size:12px"></textarea>
+    <textarea id="scriptText" readonly></textarea>
     <div class="msg" id="scriptMsg"></div>
   </div>
 </div>
+
+<div class="toast" id="toast"></div>
+
 <script>
 const token=localStorage.getItem('token');
 if(!token){ location.href='/login'; }
@@ -198,6 +221,7 @@ const H={'Authorization':'Bearer '+token,'Content-Type':'application/json'};
 let routers=[]; let customers=[]; let mainDomain='alnooah.pro';
 
 function logout(){ localStorage.removeItem('token'); location.href='/login'; }
+function toast(msg, type='ok'){ const t=document.getElementById('toast'); t.textContent=msg; t.className='toast show '+type; clearTimeout(window._tt); window._tt=setTimeout(()=>t.classList.remove('show'),2600); }
 async function api(path,opts){ const r=await fetch(path,{...(opts||{}),headers:{...H,...(opts?.headers||{})}}); const t=await r.text(); let d; try{d=JSON.parse(t)}catch{d=t} if(!r.ok) throw new Error(d.error||r.statusText); return d; }
 
 async function load(){
@@ -240,15 +264,15 @@ function renderCustomers(){
 
 async function saveCount(id){
   const input=document.getElementById('cnt-'+id);
-  try{ await api('/api/customers/'+id,{method:'PATCH',body:JSON.stringify({router_count:parseInt(input.value,10)})}); load(); }catch(e){ alert('خطأ: '+e.message); }
+  try{ await api('/api/customers/'+id,{method:'PATCH',body:JSON.stringify({router_count:parseInt(input.value,10)})}); toast('تم حفظ العدد'); load(); }catch(e){ toast('خطأ: '+e.message,'err'); }
 }
-async function delCustomer(id){ if(!confirm('حذف العميل؟')) return; try{ await api('/api/customers/'+id,{method:'DELETE'}); load(); }catch(e){ alert('خطأ: '+e.message); } }
+async function delCustomer(id){ if(!confirm('حذف العميل؟')) return; try{ await api('/api/customers/'+id,{method:'DELETE'}); toast('تم الحذف'); load(); }catch(e){ toast('خطأ: '+e.message,'err'); } }
 
 async function addCustomer(){
   const msg=document.getElementById('cmsg'); msg.textContent=''; msg.className='msg';
   const body={ name: document.getElementById('c_name').value.trim(), phone: document.getElementById('c_phone').value.trim(), email: document.getElementById('c_email').value.trim(), router_count: parseInt(document.getElementById('c_count').value,10)||1 };
   if(!body.name){ msg.textContent='اسم العميل مطلوب'; msg.className='msg err'; return; }
-  try{ await api('/api/customers',{method:'POST',body:JSON.stringify(body)}); msg.textContent='تم حفظ العميل ✅'; msg.className='msg ok'; ['c_name','c_phone','c_email'].forEach(id=>document.getElementById(id).value=''); document.getElementById('c_count').value=1; load(); }catch(e){ msg.textContent='خطأ: '+e.message; msg.className='msg err'; }
+  try{ await api('/api/customers',{method:'POST',body:JSON.stringify(body)}); msg.textContent='تم حفظ العميل ✅'; msg.className='msg ok'; toast('تم حفظ العميل'); ['c_name','c_phone','c_email'].forEach(id=>document.getElementById(id).value=''); document.getElementById('c_count').value=1; load(); }catch(e){ msg.textContent='خطأ: '+e.message; msg.className='msg err'; }
 }
 
 function renderRouters(){
@@ -279,8 +303,7 @@ function renderRouters(){
           ? `<button class="btn sm primary" onclick="setStatus('${r.id}','active')">تفعيل</button>`
           : `<button class="btn sm ghost" onclick="setStatus('${r.id}','disabled')">إيقاف</button>`}
         <button class="btn sm danger" onclick="delRouter('${r.id}')">حذف</button>
-        <button class="btn sm ghost" onclick="genScript('${r.id}',6)">v6</button>
-        <button class="btn sm ghost" onclick="genScript('${r.id}',7)">v7</button>
+        <button class="btn sm ghost" onclick="genScript('${r.id}',${r.ros_major||7})">سكربت</button>
         <button class="btn sm ghost" onclick="viewAgent('${r.id}')">وكيل</button>
       </div></td>`;
     tb.appendChild(tr);
@@ -290,20 +313,78 @@ function renderRouters(){
 }
 
 async function setRos(id,val){
-  try{ await api('/api/routers/'+id,{method:'PATCH',body:JSON.stringify({ros_major: val?parseInt(val,10):null})}); }catch(e){ alert('خطأ: '+e.message); }
+  try{ await api('/api/routers/'+id,{method:'PATCH',body:JSON.stringify({ros_major: val?parseInt(val,10):null})}); toast('تم تحديث الإصدار'); }catch(e){ toast('خطأ: '+e.message,'err'); }
 }
 async function setStatus(id,status){
-  try{ await api('/api/routers/'+id,{method:'PATCH',body:JSON.stringify({status})}); load(); }catch(e){ alert('خطأ: '+e.message); }
+  try{ await api('/api/routers/'+id,{method:'PATCH',body:JSON.stringify({status})}); toast(status==='active'?'تم التفعيل':'تم الإيقاف'); load(); }catch(e){ toast('خطأ: '+e.message,'err'); }
 }
 async function toggleRenewal(id,val){
-  try{ await api('/api/routers/'+id,{method:'PATCH',body:JSON.stringify({renewal_enabled:val})}); load(); }catch(e){ alert('خطأ: '+e.message); }
+  try{ await api('/api/routers/'+id,{method:'PATCH',body:JSON.stringify({renewal_enabled:val})}); toast(val?'تم تفعيل التجديد':'تم إيقاف التجديد'); load(); }catch(e){ toast('خطأ: '+e.message,'err'); }
 }
 async function delRouter(id){
   if(!confirm('حذف الموجه؟ (سيتم حذف شهاداته)')) return;
-  try{ await api('/api/routers/'+id,{method:'DELETE'}); load(); }catch(e){ alert('خطأ: '+e.message); }
+  try{ await api('/api/routers/'+id,{method:'DELETE'}); toast('تم الحذف'); load(); }catch(e){ toast('خطأ: '+e.message,'err'); }
 }
 
 function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function addRouter(){
+  const msg=document.getElementById('msg'); msg.textContent=''; msg.className='msg';
+  const body={
+    customer_id: document.getElementById('customer_id').value || null,
+    network_name: document.getElementById('network_name').value.trim(),
+    network_number: document.getElementById('network_number').value.trim(),
+    hotspot_local_ip: document.getElementById('hotspot_local_ip').value.trim(),
+    hotspot_dns_name: document.getElementById('hotspot_dns_name').value.trim(),
+    hotspot_profile: document.getElementById('hotspot_profile').value.trim()||'hsprof1',
+    subscription_months: parseInt(document.getElementById('subscription_months').value,10)||1,
+  };
+  if(!body.network_name||!body.hotspot_local_ip||!body.hotspot_dns_name){ msg.textContent='يرجى تعبئة الحقول المطلوبة'; msg.className='msg err'; return; }
+  try{
+    const res=await api('/api/routers',{method:'POST',body:JSON.stringify(body)});
+    routers.unshift(res.router);
+    renderRouters();
+    msg.textContent='تمت الإضافة بنجاح ✅'; msg.className='msg ok';
+    toast('تمت الإضافة بنجاح');
+    const info=document.getElementById('agentInfo'); info.style.display='block';
+    document.getElementById('agentBox').textContent=`URL Token: ${res.agent.url_token}\nAgent User: ${res.agent.agent_user}\nAgent Secret: ${res.agent.agent_secret}\nBase: https://${location.hostname}/agent/v1/${res.agent.url_token}/`;
+    ['network_name','network_number','hotspot_local_ip','hotspot_dns_name'].forEach(id=>document.getElementById(id).value='');
+    updateDnsHint();
+  }catch(e){ msg.textContent='خطأ: '+e.message; msg.className='msg err'; toast('خطأ: '+e.message,'err'); }
+}
+
+async function viewAgent(id){
+  try{
+    const c=await api('/api/routers/'+id+'/agent');
+    alert(`URL Token: ${c.url_token}\nAgent User: ${c.agent_user}\nAgent Secret: ${c.agent_secret}\nBase: https://${location.hostname}/agent/v1/${c.url_token}/`);
+  }catch(e){ toast('خطأ: '+e.message,'err'); }
+}
+
+let currentScriptId=null; let currentScripts=null; let currentScriptTab='allInOne';
+async function genScript(id,ros){
+  currentScriptId=id;
+  document.getElementById('scriptRos').value=ros||7;
+  document.getElementById('scriptModal').style.display='flex';
+  await loadScripts();
+}
+async function loadScripts(){
+  const ros=document.getElementById('scriptRos').value;
+  const r=await fetch('/api/routers/'+currentScriptId+'/scripts?ros='+ros,{headers:H});
+  if(!r.ok){ document.getElementById('scriptMsg').textContent='خطأ: '+r.statusText; return; }
+  currentScripts=await r.json();
+  showScriptTab(currentScriptTab,null);
+  try{ await navigator.clipboard.writeText(currentScripts[currentScriptTab]); document.getElementById('scriptMsg').textContent='✅ تم إنشاء السكربت ونسخه تلقائياً'; document.getElementById('scriptMsg').className='msg ok'; toast('تم النسخ تلقائياً'); }catch(e){ document.getElementById('scriptMsg').textContent='تم الإنشاء (انسخ يدوياً)'; }
+}
+function showScriptTab(tab,el){
+  currentScriptTab=tab;
+  if(currentScripts) document.getElementById('scriptText').value=currentScripts[tab]||'';
+  document.querySelectorAll('#scriptModal .tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+}
+async function copyScript(){
+  try{ await navigator.clipboard.writeText(document.getElementById('scriptText').value); document.getElementById('scriptMsg').textContent='✅ تم النسخ'; document.getElementById('scriptMsg').className='msg ok'; toast('تم النسخ'); }catch(e){ document.getElementById('scriptMsg').textContent='فشل النسخ، انسخ يدوياً'; document.getElementById('scriptMsg').className='msg err'; }
+}
+function closeScriptModal(){ document.getElementById('scriptModal').style.display='none'; }
 
 function updateDnsHint(){
   const v=document.getElementById('hotspot_dns_name').value.trim();
@@ -321,66 +402,10 @@ async function saveMainDomain(){
     const s=await api('/api/settings',{method:'PATCH',body:JSON.stringify({main_domain:val,apply_to_all:apply})});
     mainDomain=s.main_domain;
     msg.textContent='تم حفظ النطاق ✅'+(apply?' (طبق على الجميع)':''); msg.className='msg ok';
-    load();
-  }catch(e){ msg.textContent='خطأ: '+e.message; msg.className='msg err'; }
+    toast('تم حفظ النطاق');
+    updateDnsHint(); load();
+  }catch(e){ msg.textContent='خطأ: '+e.message; msg.className='msg err'; toast('خطأ: '+e.message,'err'); }
 }
-
-async function addRouter(){
-  const msg=document.getElementById('msg'); msg.textContent=''; msg.className='msg';
-  const body={
-    customer_id: document.getElementById('customer_id').value || null,
-    network_name: document.getElementById('network_name').value.trim(),
-    network_number: document.getElementById('network_number').value.trim(),
-    hotspot_local_ip: document.getElementById('hotspot_local_ip').value.trim(),
-    hotspot_dns_name: document.getElementById('hotspot_dns_name').value.trim(),
-    hotspot_profile: document.getElementById('hotspot_profile').value.trim()||'hsprof1',
-    subscription_months: parseInt(document.getElementById('subscription_months').value,10)||1,
-  };
-  if(!body.network_name||!body.hotspot_local_ip||!body.hotspot_dns_name){ msg.textContent='يرجى تعبئة الحقول المطلوبة (اسم الشبكة، IP، النطاق)'; msg.className='msg err'; return; }
-  try{
-    const res=await api('/api/routers',{method:'POST',body:JSON.stringify(body)});
-    routers.unshift(res.router);
-    renderRouters();
-    msg.textContent='تمت الإضافة بنجاح ✅'; msg.className='msg ok';
-    const info=document.getElementById('agentInfo'); info.style.display='block';
-    document.getElementById('agentBox').textContent=`URL Token: ${res.agent.url_token}\nAgent User: ${res.agent.agent_user}\nAgent Secret: ${res.agent.agent_secret}\nBase: https://${location.hostname}/agent/v1/${res.agent.url_token}/`;
-    ['network_name','network_number','hotspot_local_ip','hotspot_dns_name'].forEach(id=>document.getElementById(id).value='');
-  }catch(e){ msg.textContent='خطأ: '+e.message; msg.className='msg err'; }
-}
-
-async function viewAgent(id){
-  try{
-    const c=await api('/api/routers/'+id+'/agent');
-    alert(`URL Token: ${c.url_token}\nAgent User: ${c.agent_user}\nAgent Secret: ${c.agent_secret}\nBase: https://${location.hostname}/agent/v1/${c.url_token}/`);
-  }catch(e){ alert('خطأ: '+e.message); }
-}
-
-let currentScriptId=null; let currentScripts=null; let currentScriptTab='allInOne';
-async function genScript(id,ros){
-  currentScriptId=id;
-  document.getElementById('scriptRos').value=ros||7;
-  await loadScripts();
-  document.getElementById('scriptModal').style.display='flex';
-}
-async function loadScripts(){
-  const ros=document.getElementById('scriptRos').value;
-  const r=await fetch('/api/routers/'+currentScriptId+'/scripts?ros='+ros,{headers:H});
-  if(!r.ok){ document.getElementById('scriptMsg').textContent='خطأ: '+r.statusText; return; }
-  currentScripts=await r.json();
-  showScriptTab(currentScriptTab,null);
-  // auto-copy
-  try{ await navigator.clipboard.writeText(currentScripts[currentScriptTab]); document.getElementById('scriptMsg').textContent='✅ تم إنشاء السكربت ونسخه تلقائياً'; document.getElementById('scriptMsg').className='msg ok'; }catch(e){ document.getElementById('scriptMsg').textContent='تم الإنشاء (انسخ يدوياً)'; }
-}
-function showScriptTab(tab,el){
-  currentScriptTab=tab;
-  if(currentScripts) document.getElementById('scriptText').value=currentScripts[tab]||'';
-  document.querySelectorAll('#scriptModal .tab').forEach(t=>t.classList.remove('active'));
-  if(el) el.classList.add('active');
-}
-async function copyScript(){
-  try{ await navigator.clipboard.writeText(document.getElementById('scriptText').value); document.getElementById('scriptMsg').textContent='✅ تم النسخ'; document.getElementById('scriptMsg').className='msg ok'; }catch(e){ document.getElementById('scriptMsg').textContent='فشل النسخ، انسخ يدوياً'; document.getElementById('scriptMsg').className='msg err'; }
-}
-function closeScriptModal(){ document.getElementById('scriptModal').style.display='none'; }
 
 async function loadCertsCount(){
   try{ const c=await api('/api/certificates'); document.getElementById('stCerts').textContent=c.filter(x=>x.status==='issued').length; }catch{}
@@ -406,14 +431,14 @@ async function loadCertsTable(){
 }
 async function revokeCert(id){
   if(!confirm('إيقاف/إلغاء هذه الشهادة؟')) return;
-  try{ await api('/api/certificates/'+id,{method:'PATCH',body:JSON.stringify({status:'revoked',renewal_enabled:false})}); load(); }catch(e){ alert('خطأ: '+e.message); }
+  try{ await api('/api/certificates/'+id,{method:'PATCH',body:JSON.stringify({status:'revoked',renewal_enabled:false})}); toast('تم الإيقاف'); load(); }catch(e){ toast('خطأ: '+e.message,'err'); }
 }
 async function toggleCertRenewal(id,val){
-  try{ await api('/api/certificates/'+id,{method:'PATCH',body:JSON.stringify({renewal_enabled:val})}); load(); }catch(e){ alert('خطأ: '+e.message); }
+  try{ await api('/api/certificates/'+id,{method:'PATCH',body:JSON.stringify({renewal_enabled:val})}); toast(val?'تم تفعيل التجديد':'تم إيقاف التجديد'); load(); }catch(e){ toast('خطأ: '+e.message,'err'); }
 }
 async function delCert(id){
   if(!confirm('حذف الشهادة؟')) return;
-  try{ await api('/api/certificates/'+id,{method:'DELETE'}); load(); }catch(e){ alert('خطأ: '+e.message); }
+  try{ await api('/api/certificates/'+id,{method:'DELETE'}); toast('تم الحذف'); load(); }catch(e){ toast('خطأ: '+e.message,'err'); }
 }
 
 load();

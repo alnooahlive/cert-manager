@@ -6,20 +6,24 @@
 <title>تسجيل الدخول — مدير الشهادات</title>
 <link rel="icon" href="/favicon.svg" />
 <style>
-  :root{--bg:#0f172a;--card:#1e293b;--border:#334155;--text:#e2e8f0;--muted:#94a3b8;--accent:#3b82f6;--danger:#ef4444}
+  @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
+  :root{--bg:#080e1a;--card:#131f38;--border:#1f2d4a;--text:#e8eef9;--muted:#7e93b8;--accent:#4f8cff;--accent2:#9b6bff;--danger:#f87171}
   *{box-sizing:border-box}
-  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(1200px 600px at 50% -10%,#1e3a8a33,transparent),var(--bg);font-family:'Segoe UI',Tahoma,Arial,sans-serif;color:var(--text)}
-  .card{width:100%;max-width:400px;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:36px 32px;box-shadow:0 20px 60px #0006}
-  h1{margin:0 0 6px;font-size:24px}
-  p.sub{margin:0 0 24px;color:var(--muted);font-size:14px}
-  label{display:block;font-size:13px;color:var(--muted);margin:14px 0 6px}
-  input{width:100%;padding:12px 14px;border-radius:10px;border:1px solid var(--border);background:#0b1220;color:var(--text);font-size:15px}
-  input:focus{outline:none;border-color:var(--accent)}
-  button{width:100%;margin-top:22px;padding:13px;border-radius:10px;border:none;background:var(--accent);color:#fff;font-size:16px;font-weight:600;cursor:pointer}
-  button:hover{filter:brightness(1.1)}
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(1200px 600px at 50% -10%,#1e3a8a33,transparent),var(--bg);font-family:'Tajawal',sans-serif;color:var(--text)}
+  .card{width:100%;max-width:420px;background:linear-gradient(180deg,rgba(19,31,56,.95),rgba(13,21,38,.95));border:1px solid var(--border);border-radius:20px;padding:40px 34px;box-shadow:0 20px 60px #0006;animation:fadeIn .4s ease}
+  h1{margin:0 0 6px;font-size:22px;font-weight:800}
+  p.sub{margin:0 0 26px;color:var(--muted);font-size:14px}
+  label{display:block;font-size:12px;color:var(--muted);margin:14px 0 6px;font-weight:600}
+  input{width:100%;padding:12px 14px;border-radius:11px;border:1px solid var(--border);background:rgba(8,14,26,.6);color:var(--text);font-size:15px;font-family:inherit;transition:border-color .18s}
+  input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px #4f8cff22}
+  button{width:100%;margin-top:24px;padding:14px;border-radius:11px;border:none;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;box-shadow:0 4px 14px #4f8cff44;transition:transform .18s}
+  button:hover{transform:translateY(-1px)}
   .err{margin-top:14px;color:var(--danger);font-size:13px;min-height:18px}
-  .logo{display:flex;align-items:center;gap:10px;margin-bottom:18px}
-  .logo .dot{width:34px;height:34px;border-radius:10px;background:linear-gradient(135deg,#3b82f6,#8b5cf6);display:flex;align-items:center;justify-content:center;font-weight:700}
+  .logo{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+  .logo .dot{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;box-shadow:0 4px 14px #4f8cff44}
+  .remember{display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;color:var(--text)}
+  .remember input{width:auto;margin:0}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 </style>
 </head>
 <body>
@@ -30,9 +34,7 @@
     <input id="email" type="email" autocomplete="username" />
     <label>كلمة المرور</label>
     <input id="password" type="password" autocomplete="current-password" />
-    <label style="display:flex;align-items:center;gap:8px;margin-top:14px;font-size:13px;color:var(--text)">
-      <input id="remember" type="checkbox" style="width:auto;margin:0" /> تذكرني (30 يوم)
-    </label>
+    <label class="remember"><input id="remember" type="checkbox" /> تذكرني (30 يوم)</label>
     <button onclick="login()">دخول</button>
     <div class="err" id="err"></div>
   </div>
