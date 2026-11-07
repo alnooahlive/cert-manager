@@ -4,6 +4,16 @@ import pool from './db';
 import app from './server';
 import { hashPassword } from './auth';
 
+// env validation
+function validateEnv() {
+  const required = ['DATABASE_URL', 'SESSION_SECRET'];
+  const missing = required.filter(k => !process.env[k]);
+  if (missing.length) {
+    console.error('missing env vars:', missing.join(', '));
+    process.exit(1);
+  }
+}
+
 async function runMigrations() {
   try {
     const dir = path.join(process.cwd(), 'migrations');
@@ -33,11 +43,19 @@ async function runMigrations() {
 }
 
 async function main() {
+  validateEnv();
   await runMigrations();
   const port = parseInt(process.env.PORT || '3000', 10);
-  app.listen(port, () => {
+  const server = app.listen(port, () => {
     console.log(`cert-manager listening on ${port}`);
   });
+  const shutdown = (sig: string) => {
+    console.log(`received ${sig}, shutting down`);
+    server.close(() => { pool.end().then(() => process.exit(0)); });
+    setTimeout(() => process.exit(1), 10000);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 main();

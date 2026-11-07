@@ -13,6 +13,9 @@ router.get('/', async (_req, res) => {
 
 router.post('/', async (req, res) => {
   const b = req.body || {};
+  if (!b.network_name && !b.router_name) return res.status(400).json({ error: 'network_name required' });
+  if (!b.hotspot_local_ip) return res.status(400).json({ error: 'hotspot_local_ip required' });
+  if (!b.hotspot_dns_name) return res.status(400).json({ error: 'hotspot_dns_name required' });
   const rows = await query(
     `INSERT INTO routers(customer_id,customer_name,phone,email,router_name,ros_major,hotspot_profile,hotspot_local_ip,hotspot_dns_name,subscription_months,network_name,network_number)
      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,

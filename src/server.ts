@@ -2,6 +2,7 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import path from 'path';
 
 import healthRoutes from './routes/health';
@@ -18,6 +19,15 @@ app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '5mb' }));
 app.use(cookieParser());
 
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, max: 20, standardHeaders: true, legacyHeaders: false });
+app.use('/api/auth/login', authLimiter);
+
+// simple request log
+app.use((req, _res, next) => {
+  if (process.env.LOG_LEVEL === 'debug') console.log(`${req.method} ${req.path}`);
+  next();
+});
+
 app.use('/health', healthRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/certificates', certRoutes);
@@ -31,5 +41,11 @@ app.use(express.static(path.join(process.cwd(), 'public')));
 app.get('/login', (_req, res) => res.sendFile(path.join(process.cwd(), 'public', 'login.html')));
 app.get('/dashboard', (_req, res) => res.sendFile(path.join(process.cwd(), 'public', 'dashboard.html')));
 app.get('/', (_req, res) => res.sendFile(path.join(process.cwd(), 'public', 'dashboard.html')));
+
+// centralized error handler
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('unhandled error:', err?.message || err);
+  res.status(err?.status || 500).json({ error: err?.message || 'internal error' });
+});
 
 export default app;
