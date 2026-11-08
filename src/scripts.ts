@@ -23,6 +23,7 @@ function cleanScript(raw: string): string {
     const s = ln.trim();
     if (s.startsWith('#')) continue;
     if (s === '') continue;
+    if (s.startsWith(':put')) continue;
     if (ln.includes('source={')) {
       ln = ln.split('source={', 1)[0] + 'source={';
     } else if (ln.includes(' #') && !ln.includes('source={')) {
