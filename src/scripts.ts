@@ -139,10 +139,9 @@ export function updateScript(ctx: ScriptContext): string {
 }
 
 export function bootstrapScript(ctx: ScriptContext): string {
+  const base = `https://${ctx.agent_host}/agent/v1/${ctx.url_token}`;
+  const cc = 'no'; // bootstrap uses no for v6 safety; update script detects at runtime
   return cleanScript(`# ===== hs-cert bootstrap (AUTO) | router=${ctx.router_name} | template v${ctx.template_version || '1'} =====
-# 0) backup (disabled)
-# /export file=before-hs-cert
-# /system backup save name=before-hs-cert
 
 # detect ROS major
 :local rosVer [/system resource get version]
@@ -153,7 +152,6 @@ export function bootstrapScript(ctx: ScriptContext): string {
 # 1) verify clock/ntp
 :put [/system clock print]
 :put [/system ntp client print]
-:if ($rosMajor = 7) do={ :put [/system device-mode print] }
 
 # 2) DNS static (idempotent)
 :do { /ip dns static add name=${ctx.hotspot_dns_name} address=${ctx.hotspot_local_ip} type=A comment="hs-cert" } on-error={ }
@@ -162,15 +160,28 @@ export function bootstrapScript(ctx: ScriptContext): string {
 /ip hotspot profile set [find where name=${ctx.hotspot_profile}] dns-name=${ctx.hotspot_dns_name} login-by=https,http-chap
 :if ($rosMajor = 6) do={ /ip hotspot profile set [find where name=${ctx.hotspot_profile}] https-redirect=no }
 
-# 4) create update script
-/system script remove [find where name=hs-cert-update]
-/system script add name=hs-cert-update policy=read,write,test,policy,sensitive comment="0" source={${updateScript(ctx).replace(/^/gm, '    ')}}
+# 4) fetch update script from server (no nested braces)
+:local waited 0
+:do { /file remove [find where name=hs-update.rsc] } on-error={ }
+/tool fetch url=${base}/update.rsc user=${ctx.agent_user} password=${ctx.agent_secret} check-certificate=no dst-path=hs-update.rsc
+:while ([:len [/file find where name=hs-update.rsc]] = 0) do={
+    :delay 1s
+    :set waited ($waited + 1)
+    :if ($waited > 15) do={ :error "update script not downloaded" }
+}
+:delay 2s
 
-# 5) scheduler (daily 04:xx)
+# 5) create stored script from file
+/system script remove [find where name=hs-cert-update]
+/system script add name=hs-cert-update comment="0"
+/system script set [find where name=hs-cert-update] source=[/file get hs-update.rsc contents]
+:do { /file remove [find where name=hs-update.rsc] } on-error={ }
+
+# 6) scheduler (daily 04:xx)
 /system scheduler remove [find where name=hs-cert-update]
 /system scheduler add name=hs-cert-update interval=1d start-time=04:00:00 on-event="/system script run hs-cert-update"
 
-# 6) run once
+# 7) run once
 /system script run hs-cert-update
 `);
 }
