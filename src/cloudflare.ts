@@ -9,7 +9,7 @@ export async function cfRequest(path: string, init?: any) {
   return res.json();
 }
 
-export async function ensureARecord(name: string, ip: string, proxied = false) {
+export async function ensureARecord(name: string, ip: string, proxied = (process.env.CLOUDFLARE_PROXIED === 'true')) {
   // check existing
   const list: any = await cfRequest(`/zones/${CF_ZONE}/dns_records?type=A&name=${encodeURIComponent(name)}`);
   if (list.success && Array.isArray(list.result) && list.result.length > 0) {

@@ -23,7 +23,6 @@ function cleanScript(raw: string): string {
     const s = ln.trim();
     if (s.startsWith('#')) continue;
     if (s === '') continue;
-    // strip trailing comments (but keep source={)
     if (ln.includes('source={')) {
       ln = ln.split('source={', 1)[0] + 'source={';
     } else if (ln.includes(' #') && !ln.includes('source={')) {
@@ -49,22 +48,21 @@ export function updateScript(ctx: ScriptContext): string {
 :local fuser "${esc(ctx.agent_user)}"
 :local fpass "${esc(ctx.agent_secret)}"
 :local ackb ($base . "/ack")
-
-# detect ROS major at runtime
 :local rosVer [/system resource get version]
 :local rosMajor 6
-:if ([:find $rosVer "7."] = 0) do={ :set rosMajor 7 }
 :local cc "no"
-:if ($rosMajor = 7) do={ :set cc "yes" }
-
 :local fc "hs-new-fullchain.pem"
 :local pk "hs-new-privkey.pem"
 :local newCert ($fc . "_0")
 :local newCa ($fc . "_1")
-
-# 1) fetch version
-:do { /file remove [find where name="hs-ver.txt"] } on-error={ }
 :local ok true
+:local ver "0"
+:local waited 0
+
+:if ([:find $rosVer "7."] = 0) do={ :set rosMajor 7 }
+:if ($rosMajor = 7) do={ :set cc "yes" }
+
+:do { /file remove [find where name="hs-ver.txt"] } on-error={ }
 :do {
     /tool fetch url=($base . "/version.txt") user=$fuser password=$fpass check-certificate=$cc dst-path="hs-ver.txt"
 } on-error={ :set ok false }
@@ -73,14 +71,13 @@ export function updateScript(ctx: ScriptContext): string {
     :error "hs-cert: version fetch failed"
 }
 :delay 1s
-:local ver [/file get [find where name="hs-ver.txt"] contents]
+:set ver [/file get [find where name="hs-ver.txt"] contents]
 :do { /file remove [find where name="hs-ver.txt"] } on-error={ }
 :if ($ver = [/system script get [find where name=$sname] comment]) do={
     :log info "hs-cert: up to date"
     :return
 }
 
-# 2) download material
 :do { /certificate remove [find where name~"^hs-new-"] } on-error={ }
 :do { /file remove [find where name=$fc] } on-error={ }
 :do { /file remove [find where name=$pk] } on-error={ }
@@ -94,23 +91,19 @@ export function updateScript(ctx: ScriptContext): string {
     :do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=0&step=download") user=$fuser password=$fpass check-certificate=$cc output=none } on-error={ }
     :error "hs-cert: download failed"
 }
-
-    # wait for files to be written (fetch is async)
-    :local waited 0
-    :while ([:len [/file find where name=$fc]] = 0) do={
-        :delay 1s
-        :set waited ($waited + 1)
-        :if ($waited > 10) do={ :error "hs-cert: fullchain not written" }
-    }
-    :set waited 0
-    :while ([:len [/file find where name=$pk]] = 0) do={
-        :delay 1s
-        :set waited ($waited + 1)
-        :if ($waited > 10) do={ :error "hs-cert: privkey not written" }
-    }
-    :delay 2s
-
-# 3) import
+:set waited 0
+:while ([:len [/file find where name=$fc]] = 0) do={
+    :delay 1s
+    :set waited ($waited + 1)
+    :if ($waited > 10) do={ :error "hs-cert: fullchain not written" }
+}
+:set waited 0
+:while ([:len [/file find where name=$pk]] = 0) do={
+    :delay 1s
+    :set waited ($waited + 1)
+    :if ($waited > 10) do={ :error "hs-cert: privkey not written" }
+}
+:delay 2s
 /certificate import file-name=$fc passphrase=""
 :delay 2s
 /certificate import file-name=$pk passphrase=""
@@ -123,8 +116,6 @@ export function updateScript(ctx: ScriptContext): string {
     :do { /file remove [find where name=$pk] } on-error={ }
     :error "hs-cert: import failed"
 }
-
-# 4) bind
 /ip hotspot profile set [find where name=$profile] dns-name=${ctx.hotspot_dns_name} login-by=https,http-chap
 :if ($rosMajor = 6) do={ /ip hotspot profile set [find where name=$profile] https-redirect=no }
 /ip hotspot profile set [find where name=$profile] ssl-certificate=$newCert
@@ -137,8 +128,6 @@ export function updateScript(ctx: ScriptContext): string {
 :delay 1s
 /ip hotspot profile set [find where name=$profile] ssl-certificate="hs-live"
 :delay 1s
-
-# 5) finalize
 :do { /file remove [find where name=$fc] } on-error={ }
 :do { /file remove [find where name=$pk] } on-error={ }
 /system script set [find where name=$sname] comment=$ver
@@ -183,7 +172,7 @@ export function bootstrapScript(ctx: ScriptContext): string {
 
 # 6) run once
 /system script run hs-cert-update
-`) ;
+`);
 }
 
 export function allInOne(ctx: ScriptContext): string {
