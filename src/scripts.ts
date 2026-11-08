@@ -174,7 +174,8 @@ export function bootstrapScript(ctx: ScriptContext): string {
 # 5) create stored script from file
 /system script remove [find where name=hs-cert-update]
 /system script add name=hs-cert-update comment="0"
-/system script set [find where name=hs-cert-update] source=[/file get hs-update.rsc contents]
+:local src [/file get hs-update.rsc contents]
+/system script set [find where name=hs-cert-update] source=$src
 :do { /file remove [find where name=hs-update.rsc] } on-error={ }
 
 # 6) scheduler (daily 04:xx)
