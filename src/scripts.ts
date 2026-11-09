@@ -31,10 +31,14 @@ function cleanScript(raw: string): string {
       if (ln.trim() === '') continue;
     }
     const t = ln.trimEnd();
-    if (t.endsWith('{') || t.endsWith('}') || t.endsWith(';') || t === '') {
+    if (t === '') {
       out.push(t);
-    } else {
+    } else if (t.endsWith('{')) {
+      out.push(t);
+    } else if (!t.endsWith(';')) {
       out.push(t + ';');
+    } else {
+      out.push(t);
     }
   }
   return out.join('\n');
@@ -71,7 +75,7 @@ export function updateScript(ctx: ScriptContext): string {
     :log error "hs-cert: version fetch failed"
     :error "hs-cert: version fetch failed"
 }
-:delay 1s
+:delay 5s
 :set ver [/file get [find where name="hs-ver.txt"] contents]
 :do { /file remove [find where name="hs-ver.txt"] } on-error={ }
 :if ($ver = [/system script get [find where name=$sname] comment]) do={
@@ -94,22 +98,22 @@ export function updateScript(ctx: ScriptContext): string {
 }
 :set waited 0
 :while ([:len [/file find where name=$fc]] = 0) do={
-    :delay 1s
+    :delay 5s
     :set waited ($waited + 1)
     :if ($waited > 10) do={ :error "hs-cert: fullchain not written" }
 }
 :set waited 0
 :while ([:len [/file find where name=$pk]] = 0) do={
-    :delay 1s
+    :delay 5s
     :set waited ($waited + 1)
     :if ($waited > 10) do={ :error "hs-cert: privkey not written" }
 }
-:delay 2s
+:delay 5s
 /certificate import file-name=$fc passphrase=""
-:delay 2s
+:delay 5s
 /certificate import file-name=$pk passphrase=""
-:delay 2s
-:delay 3s
+:delay 5s
+:delay 5s
 :if ([:len [/certificate find where name=$newCert]] = 0) do={
     :log error "hs-cert: import failed"
     :do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=0&step=import") user=$fuser password=$fpass check-certificate=$cc output=none } on-error={ }
@@ -120,15 +124,15 @@ export function updateScript(ctx: ScriptContext): string {
 /ip hotspot profile set [find where name=$profile] dns-name=${ctx.hotspot_dns_name} login-by=https,http-chap
 :if ($rosMajor = 6) do={ /ip hotspot profile set [find where name=$profile] https-redirect=no }
 /ip hotspot profile set [find where name=$profile] ssl-certificate=$newCert
-:delay 2s
+:delay 5s
 :do { /certificate remove [find where name~"^hs-live"] } on-error={ }
-:delay 1s
+:delay 5s
 :do { /certificate set [find where name=$newCert] name="hs-live" } on-error={ }
-:delay 1s
+:delay 5s
 :do { /certificate set [find where name=$newCa] name="hs-live-ca" } on-error={ }
-:delay 1s
+:delay 5s
 /ip hotspot profile set [find where name=$profile] ssl-certificate="hs-live"
-:delay 1s
+:delay 5s
 :do { /file remove [find where name=$fc] } on-error={ }
 :do { /file remove [find where name=$pk] } on-error={ }
 /system script set [find where name=$sname] comment=$ver
@@ -165,11 +169,11 @@ export function bootstrapScript(ctx: ScriptContext): string {
 :do { /file remove [find where name=hs-update.rsc] } on-error={ }
 /tool fetch url=${base}/update.rsc user=${ctx.agent_user} password=${ctx.agent_secret} check-certificate=no dst-path=hs-update.rsc
 :while ([:len [/file find where name=hs-update.rsc]] = 0) do={
-    :delay 1s
+    :delay 5s
     :set waited ($waited + 1)
     :if ($waited > 15) do={ :error "update script not downloaded" }
 }
-:delay 2s
+:delay 5s
 
 # 5) create stored script from file
 /system script remove [find where name=hs-cert-update]
