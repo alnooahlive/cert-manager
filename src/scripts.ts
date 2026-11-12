@@ -42,7 +42,7 @@ function cleanScript(raw: string): string {
 
 export function updateScript(ctx: ScriptContext): string {
   const base = `https://${ctx.agent_host}/agent/v1/${ctx.url_token}`;
-  return cleanScript(`:local sname "hs-cert-update"
+  return cleanScript(`{ :local sname "hs-cert-update"
 :local profile "${esc(ctx.hotspot_profile)}"
 :local base "${esc(base)}"
 :local fuser "${esc(ctx.agent_user)}"
@@ -151,7 +151,7 @@ export function updateScript(ctx: ScriptContext): string {
 :do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=1&step=bind") user=$fuser password=$fpass check-certificate=$cc http-header-field=("X-Router-Serial: " . $serial) output=none } on-error={ :log warning "hs-cert: ack failed (non-fatal)" }
 :log info ("hs-cert: updated to version " . $ver)
 :return 0
-`);
+}`);
 }
 
 export function bootstrapScript(ctx: ScriptContext): string {
