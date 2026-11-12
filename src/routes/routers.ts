@@ -146,12 +146,11 @@ ${ros === '6' ? '/ip hotspot profile set [find where name=' + r.hotspot_profile 
 });
 
 router.post('/:id/issue', async (req, res) => {
-  try {
-    const result = await issueCertificate(req.params.id);
-    res.json({ ok: true, ...result });
-  } catch (e: any) {
-    res.status(500).json({ error: e.message });
-  }
+  // return immediately; run issuance in background
+  res.json({ ok: true, status: 'started' });
+  issueCertificate(req.params.id)
+    .then(r => console.log('[issue] completed for', req.params.id, r))
+    .catch(e => console.error('[issue] FAILED for', req.params.id, e.message));
 });
 
 export default router;

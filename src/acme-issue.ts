@@ -28,10 +28,12 @@ async function deleteTxtRecord(id: string) {
 }
 
 export async function issueCertificate(routerId: string) {
+  console.log('[acme] starting issuance for router', routerId);
   const router = await one('SELECT * FROM routers WHERE id=$1', [routerId]);
   if (!router) throw new Error('router not found');
   const domain = router.hotspot_dns_name;
   const zone = process.env.CLOUDFLARE_ZONE_ID;
+  console.log('[acme] domain:', domain, 'zone:', zone);
 
   const accountKey = await acme.crypto.createPrivateKey();
   const client = new acme.Client({ directoryUrl: dirUrl(), accountKey });
@@ -40,6 +42,7 @@ export async function issueCertificate(routerId: string) {
 
   const txtRecords: { id: string; name: string }[] = [];
 
+  console.log('[acme] calling client.auto for', domain);
   const certPem = await client.auto({
     csr,
     email: ACME_EMAIL,
@@ -49,8 +52,9 @@ export async function issueCertificate(routerId: string) {
       const name = `_acme-challenge.${domain}`;
       const id = await createTxtRecord(name, keyAuthorization);
       txtRecords.push({ id, name });
-      // wait for propagation
-      await new Promise(res => setTimeout(res, 15000));
+      console.log('[acme] TXT record created for', name, 'waiting for propagation...');
+      // wait for propagation (reduced from 15s to 8s)
+      await new Promise(res => setTimeout(res, 8000));
     },
     challengeRemoveFn: async (authz: any, challenge: any, keyAuthorization: string) => {
       // remove all created txt records
@@ -66,6 +70,7 @@ export async function issueCertificate(routerId: string) {
   // We need the chain. Let's get it via getCertificate? auto returns the final cert. Use splitPemChain to add intermediates? 
   // Simpler: store cert as fullchain (cert only) + key. Router imports both; fullchain may be just leaf. For hotspot, leaf is enough? Better to include chain.
   // acme-client auto returns the certificate chain (leaf + intermediates) typically. Use as-is.
+  console.log('[acme] auto completed, cert length:', certPem?.length);
   const fullchain = certPem.toString();
   const privkey = key.toString();
 
