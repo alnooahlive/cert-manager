@@ -47,6 +47,7 @@ export async function issueCertificate(routerId: string) {
     csr,
     email: ACME_EMAIL,
     termsOfServiceAgreed: true,
+    skipChallengeVerification: true,
     challengePriority: ['dns-01'],
     challengeCreateFn: async (authz: any, challenge: any, keyAuthorization: string) => {
       const name = `_acme-challenge.${domain}`;
