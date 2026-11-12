@@ -32,7 +32,7 @@ router.post('/', async (req, res) => {
     `INSERT INTO routers(customer_id,customer_name,phone,email,router_name,ros_major,hotspot_profile,hotspot_local_ip,hotspot_dns_name,subscription_months,network_name,network_number)
      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
     [b.customer_id || null, b.owner_name || b.customer_name || null, b.owner_phone || b.phone || null, b.email || null,
-     b.network_name || b.router_name || 'router', b.ros_major || null, b.hotspot_profile, b.hotspot_local_ip, b.hotspot_dns_name,
+     b.network_name || b.router_name || 'router', b.ros_major || null, b.hotspot_profile || 'hsprof1', b.hotspot_local_ip, b.hotspot_dns_name,
      b.subscription_months || 1, b.network_name || b.router_name, b.network_number || null]
   );
   const r = rows[0];
