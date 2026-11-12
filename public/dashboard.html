@@ -127,8 +127,8 @@
           <input id="hotspot_local_ip" placeholder="192.168.88.1" />
         </div>
       </div>
-      <label>النطاق الفرعي (prefix فقط)</label>
-      <input id="hotspot_dns_name" placeholder="cafe" oninput="updateDnsHint()" />
+      <label>النطاق الفرعي (prefix فقط — اتركه فارغاً لاستخدام النطاق الرئيسي مباشرة)</label>
+      <input id="hotspot_dns_name" placeholder="cafe (أو فارغ لـ wifiy.link)" oninput="updateDnsHint()" />
       <div class="dns-hint">النتيجة: <span id="dnsHint"></span></div>
       <label>ملف Hotspot Profile</label>
       <input id="hotspot_profile" placeholder="hsprof1" />
@@ -424,7 +424,7 @@ async function verifyScript(){
 function updateDnsHint(){
   const v=document.getElementById('hotspot_dns_name').value.trim();
   const hint=document.getElementById('dnsHint');
-  if(!v){ hint.textContent=''; return; }
+  if(!v){ hint.textContent=mainDomain+' (النطاق الرئيسي)'; return; }
   if(v.includes('.')){ hint.textContent=v; }
   else { hint.textContent=v+'.'+mainDomain; }
 }

@@ -17,12 +17,14 @@ router.post('/', async (req, res) => {
   const b = req.body || {};
   if (!b.network_name && !b.router_name) return res.status(400).json({ error: 'network_name required' });
   if (!b.hotspot_local_ip) return res.status(400).json({ error: 'hotspot_local_ip required' });
-  if (!b.hotspot_dns_name) return res.status(400).json({ error: 'hotspot_dns_name required' });
-  // append main domain if only prefix given
-  let dns = String(b.hotspot_dns_name).trim();
-  if (!dns.includes('.')) {
+  // allow empty -> use main domain directly (no subdomain)
+  let dns = String(b.hotspot_dns_name || '').trim();
+  if (dns === '') {
     const s = await one("SELECT value FROM settings WHERE key='main_domain'");
-    const md = s ? s.value : 'alnooah.pro';
+    dns = s ? s.value : 'wifiy.link';
+  } else if (!dns.includes('.')) {
+    const s = await one("SELECT value FROM settings WHERE key='main_domain'");
+    const md = s ? s.value : 'wifiy.link';
     dns = dns + '.' + md;
   }
   b.hotspot_dns_name = dns;
