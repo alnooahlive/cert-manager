@@ -156,7 +156,7 @@ export function updateScript(ctx: ScriptContext): string {
 
 export function bootstrapScript(ctx: ScriptContext): string {
   const base = `https://${ctx.agent_host}/agent/v1/${ctx.url_token}`;
-  return cleanScript(`# ===== hs-cert bootstrap (AUTO) | router=${ctx.router_name} | template v${ctx.template_version || '1'} =====
+  return cleanScript(`{ # ===== hs-cert bootstrap (AUTO) | router=${ctx.router_name} | template v${ctx.template_version || '1'} =====
 
 # detect ROS major
 :local rosVer [/system resource get version]
@@ -194,6 +194,7 @@ export function bootstrapScript(ctx: ScriptContext): string {
 
 # 6) run once
 /system script run hs-cert-update
+}
 `);
 
 }
