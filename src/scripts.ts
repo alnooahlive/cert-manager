@@ -138,7 +138,7 @@ export function updateScript(ctx: ScriptContext): string {
 /system script set [find where name=$sname] comment=$ver
 :do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=1&step=bind") user=$fuser password=$fpass check-certificate=$cc output=none } on-error={ :log warning "hs-cert: ack failed (non-fatal)" }
 :log info ("hs-cert: updated to version " . $ver)
-:return
+:return 0
 `);
 }
 
