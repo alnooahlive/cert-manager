@@ -40,11 +40,11 @@ function cleanScript(raw: string): string {
   return out.join('\n');
 }
 
-// Update script: no version check, always download+import+bind (simpler, more robust)
 export function updateScript(ctx: ScriptContext): string {
   const base = `https://${ctx.agent_host}/agent/v1/${ctx.url_token}`;
-  return cleanScript(`{ # ===== hs-cert-update | router=${ctx.router_name} | ROS auto | template v${ctx.template_version || '1'} =====
+  const raw = `{ # ===== hs-cert-update | router=${ctx.router_name} | ROS auto | template v${ctx.template_version || '1'} =====
 
+:local sname "hs-cert-update"
 :local profile "${esc(ctx.hotspot_profile)}"
 :local base "${esc(base)}"
 :local fuser "${esc(ctx.agent_user)}"
@@ -58,91 +58,101 @@ export function updateScript(ctx: ScriptContext): string {
 :local newCert ($fc . "_0")
 :local newCa ($fc . "_1")
 :local ok true
+:local ver "0"
+:local waited 0
 :local serial "unknown"
 
 :if ([:find $rosVer "7."] = 0) do={ :set rosMajor 7 }
 :if ($rosMajor = 7) do={ :set cc "yes" }
 
-# detect serial number
 :do { :set serial [/system routerboard get serial-number] } on-error={
     :do { :set serial [/system license get software-id] } on-error={ :set serial "unknown" }
 }
 
-# report serial to server
 :do { /tool fetch url=($base . "/serial") user=$fuser password=$fpass check-certificate=$cc http-method=post http-header-field=("X-Router-Serial: " . $serial) output=none } on-error={ }
 
-# cleanup old
-:do { /certificate remove [find where name~"^hs-new-"] } on-error={ }
-:do { /file remove [find where name=$fc] } on-error={ }
-:do { /file remove [find where name=$pk] } on-error={ }
-
-# download
-:set ok true
+:do { /file remove [find where name="hs-ver.txt"] } on-error={ }
 :do {
-    /tool fetch url=($base . "/fullchain.pem") user=$fuser password=$fpass check-certificate=$cc http-header-field=("X-Router-Serial: " . $serial) dst-path=$fc
-    /tool fetch url=($base . "/privkey.pem") user=$fuser password=$fpass check-certificate=$cc http-header-field=("X-Router-Serial: " . $serial) dst-path=$pk
+    /tool fetch url=($base . "/version.txt") user=$fuser password=$fpass check-certificate=$cc http-header-field=("X-Router-Serial: " . $serial) dst-path="hs-ver.txt"
 } on-error={ :set ok false }
 :if (!$ok) do={
-    :log error "hs-cert: download failed"
-    :do { /tool fetch url=($ackb . "?v=0&ok=0&step=download") user=$fuser password=$fpass check-certificate=$cc output=none } on-error={ }
-    :error "hs-cert: download failed"
+    :log error "hs-cert: version fetch failed"
+    :error "hs-cert: version fetch failed"
 }
+:delay 1s
+:set ver [/file get [find where name="hs-ver.txt"] contents]
+:do { /file remove [find where name="hs-ver.txt"] } on-error={ }
 
-# wait for files
-:local waited 0
-:while ([:len [/file find where name=$fc]] = 0) do={
-    :delay 1s
-    :set waited ($waited + 1)
-    :if ($waited > 10) do={ :error "hs-cert: fullchain not written" }
-}
-:set waited 0
-:while ([:len [/file find where name=$pk]] = 0) do={
-    :delay 1s
-    :set waited ($waited + 1)
-    :if ($waited > 10) do={ :error "hs-cert: privkey not written" }
-}
-:delay 2s
+:local isUpToDate false
+:if ($ver = [/system script get [find where name=$sname] comment]) do={ :set isUpToDate true }
 
-# import
-/certificate import file-name=$fc passphrase=""
-:delay 2s
-/certificate import file-name=$pk passphrase=""
-:delay 2s
-:delay 3s
-:if ([:len [/certificate find where name=$newCert]] = 0) do={
-    :log error "hs-cert: import failed"
-    :do { /tool fetch url=($ackb . "?v=0&ok=0&step=import") user=$fuser password=$fpass check-certificate=$cc output=none } on-error={ }
+:if ($isUpToDate = false) do={
+    :do { /certificate remove [find where name~"^hs-new-"] } on-error={ }
     :do { /file remove [find where name=$fc] } on-error={ }
     :do { /file remove [find where name=$pk] } on-error={ }
-    :error "hs-cert: import failed"
+    :set ok true
+    :do {
+        /tool fetch url=($base . "/fullchain.pem") user=$fuser password=$fpass check-certificate=$cc http-header-field=("X-Router-Serial: " . $serial) dst-path=$fc
+        /tool fetch url=($base . "/privkey.pem") user=$fuser password=$fpass check-certificate=$cc http-header-field=("X-Router-Serial: " . $serial) dst-path=$pk
+    } on-error={ :set ok false }
+    :if (!$ok) do={
+        :log error "hs-cert: download failed"
+        :do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=0&step=download") user=$fuser password=$fpass check-certificate=$cc output=none } on-error={ }
+        :error "hs-cert: download failed"
+    }
+    :set waited 0
+    :while ([:len [/file find where name=$fc]] = 0) do={
+        :delay 1s
+        :set waited ($waited + 1)
+        :if ($waited > 10) do={ :error "hs-cert: fullchain not written" }
+    }
+    :set waited 0
+    :while ([:len [/file find where name=$pk]] = 0) do={
+        :delay 1s
+        :set waited ($waited + 1)
+        :if ($waited > 10) do={ :error "hs-cert: privkey not written" }
+    }
+    :delay 2s
+    /certificate import file-name=$fc passphrase=""
+    :delay 2s
+    /certificate import file-name=$pk passphrase=""
+    :delay 2s
+    :delay 3s
+    :if ([:len [/certificate find where name=$newCert]] = 0) do={
+        :log error "hs-cert: import failed"
+        :do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=0&step=import") user=$fuser password=$fpass check-certificate=$cc output=none } on-error={ }
+        :do { /file remove [find where name=$fc] } on-error={ }
+        :do { /file remove [find where name=$pk] } on-error={ }
+        :error "hs-cert: import failed"
+    }
+    /ip hotspot profile set [find where name=$profile] dns-name=${ctx.hotspot_dns_name} login-by=https,http-chap
+    :if ($rosMajor = 6) do={ /ip hotspot profile set [find where name=$profile] https-redirect=no }
+    /ip hotspot profile set [find where name=$profile] ssl-certificate=$newCert
+    :delay 2s
+    :do { /certificate remove [find where name~"^hs-live"] } on-error={ }
+    :delay 1s
+    :do { /certificate set [find where name=$newCert] name="hs-live" } on-error={ }
+    :delay 1s
+    :do { /certificate set [find where name=$newCa] name="hs-live-ca" } on-error={ }
+    :delay 1s
+    /ip hotspot profile set [find where name=$profile] ssl-certificate="hs-live"
+    :delay 1s
+    :do { /file remove [find where name=$fc] } on-error={ }
+    :do { /file remove [find where name=$pk] } on-error={ }
+    /system script set [find where name=$sname] comment=$ver
+    :do { /tool fetch url=($ackb . "?v=" . $ver . "&ok=1&step=bind") user=$fuser password=$fpass check-certificate=$cc http-header-field=("X-Router-Serial: " . $serial) output=none } on-error={ :log warning "hs-cert: ack failed (non-fatal)" }
 }
 
-# bind
-/ip hotspot profile set [find where name=$profile] dns-name=${ctx.hotspot_dns_name} login-by=https,http-chap
-:if ($rosMajor = 6) do={ /ip hotspot profile set [find where name=$profile] https-redirect=no }
-/ip hotspot profile set [find where name=$profile] ssl-certificate=$newCert
-:delay 2s
-:do { /certificate remove [find where name~"^hs-live"] } on-error={ }
-:delay 1s
-:do { /certificate set [find where name=$newCert] name="hs-live" } on-error={ }
-:delay 1s
-:do { /certificate set [find where name=$newCa] name="hs-live-ca" } on-error={ }
-:delay 1s
-/ip hotspot profile set [find where name=$profile] ssl-certificate="hs-live"
-:delay 1s
-
-# finalize
-:do { /file remove [find where name=$fc] } on-error={ }
-:do { /file remove [find where name=$pk] } on-error={ }
-:do { /tool fetch url=($ackb . "?v=1&ok=1&step=bind") user=$fuser password=$fpass check-certificate=$cc http-header-field=("X-Router-Serial: " . $serial) output=none } on-error={ :log warning "hs-cert: ack failed (non-fatal)" }
-:log info "hs-cert: done"
+:if ($isUpToDate = true) do={ :log info "hs-cert: up to date" }
 :return 0
 }
-`);
+`;
+  return cleanScript(raw);
+}
 
 export function bootstrapScript(ctx: ScriptContext): string {
   const base = `https://${ctx.agent_host}/agent/v1/${ctx.url_token}`;
-  return cleanScript(`{ # ===== hs-cert bootstrap (AUTO) | router=${ctx.router_name} | template v${ctx.template_version || '1'} =====
+  const raw = `{ # ===== hs-cert bootstrap (AUTO) | router=${ctx.router_name} | template v${ctx.template_version || '1'} =====
 
 # detect ROS major
 :local rosVer [/system resource get version]
@@ -156,7 +166,7 @@ export function bootstrapScript(ctx: ScriptContext): string {
 /ip hotspot profile set [find where name=${ctx.hotspot_profile}] dns-name=${ctx.hotspot_dns_name} login-by=https,http-chap
 :if ($rosMajor = 6) do={ /ip hotspot profile set [find where name=${ctx.hotspot_profile}] https-redirect=no }
 
-# 3) fetch update script from server
+# 3) fetch update script from server (no nested braces)
 :local waited 0
 :do { /file remove [find where name=hs-update.rsc] } on-error={ }
 /tool fetch url=${base}/update.rsc user=${ctx.agent_user} password=${ctx.agent_secret} check-certificate=no dst-path=hs-update.rsc
@@ -181,9 +191,10 @@ export function bootstrapScript(ctx: ScriptContext): string {
 # 6) run once
 /system script run hs-cert-update
 }
-`);
+`;
+  return cleanScript(raw);
+}
 
 export function allInOne(ctx: ScriptContext): string {
   return bootstrapScript(ctx);
 }
-`;
