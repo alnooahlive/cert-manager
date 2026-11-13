@@ -203,6 +203,7 @@ export function bootstrapScript(ctx: ScriptContext): string {
 /system script run hs-cert-update
 }
 `);
+}
 
 export function allInOne(ctx: ScriptContext): string {
   return bootstrapScript(ctx);
