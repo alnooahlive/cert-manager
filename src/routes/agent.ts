@@ -104,6 +104,30 @@ router.post('/:token/serial', async (req, res) => {
   res.json({ ok: true, serial });
 });
 
+// Serve the full bootstrap script as a .rsc file for /import
+router.get('/:token/bootstrap.rsc', async (req, res) => {
+  const cred = await one('SELECT * FROM agent_credentials WHERE url_token=$1', [req.params.token]);
+  if (!cred) return res.status(404).send('not found');
+  if (!checkAuth(req, cred)) return res.status(403).send('forbidden');
+  const router = await one('SELECT * FROM routers WHERE id=$1', [cred.router_id]);
+  const agent_host = process.env.AGENT_HOST || 'hotspotmikrotik.alnooah.pro';
+  const { bootstrapScript } = await import('../scripts');
+  const ctx = {
+    router_name: router.network_name || router.router_name || 'router',
+    ros_major: router.ros_major || 6,
+    hotspot_profile: router.hotspot_profile,
+    hotspot_dns_name: router.hotspot_dns_name,
+    hotspot_local_ip: router.hotspot_local_ip,
+    agent_host,
+    url_token: cred.url_token,
+    agent_user: cred.agent_user,
+    agent_secret: cred.agent_secret,
+    template_version: '1',
+  };
+  const script = bootstrapScript(ctx as any);
+  res.type('text/plain').send(script);
+});
+
 router.get('/:token/ack', async (req, res) => {
   const serial = getSerial(req);
   const ctx = await resolve(req.params.token, serial);
