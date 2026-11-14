@@ -145,7 +145,7 @@ export function updateScript(ctx: ScriptContext): string {
   lines.push('}');
   lines.push('');
   lines.push(':if ($isUpToDate = true) do={ :log info "hs-cert: up to date" }');
-  lines.push(':return 0');
+  lines.push(':log info "hs-cert: done"');
   lines.push('}');
   const raw = lines.join('\n');
   return cleanScript(raw);
