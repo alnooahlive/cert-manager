@@ -40,12 +40,10 @@ function cleanScript(raw: string): string {
   return out.join('\n');
 }
 
-// Update script: no version check, no stored script needed (file-based)
 export function updateScript(ctx: ScriptContext): string {
   const base = `https://${ctx.agent_host}/agent/v1/${ctx.url_token}`;
   const lines: string[] = [];
-  lines.push('{ # ===== hs-cert-update | router=' + ctx.router_name + ' | ROS auto | template v' + (ctx.template_version || '1') + ' =====');
-  lines.push('');
+  // NO outer braces - flat script for /import context
   lines.push(':local profile "' + esc(ctx.hotspot_profile) + '"');
   lines.push(':local base "' + esc(base) + '"');
   lines.push(':local fuser "' + esc(ctx.agent_user) + '"');
@@ -59,6 +57,7 @@ export function updateScript(ctx: ScriptContext): string {
   lines.push(':local newCert ($fc . "_0")');
   lines.push(':local newCa ($fc . "_1")');
   lines.push(':local ok true');
+  lines.push(':local ver "0"');
   lines.push(':local waited 0');
   lines.push(':local serial "unknown"');
   lines.push('');
@@ -79,43 +78,42 @@ export function updateScript(ctx: ScriptContext): string {
   lines.push(':do { /file remove [find where name="hs-new-privkey.pem"] } on-error={ }');
   lines.push(':set ok true');
   lines.push(':do {');
-  lines.push('    /tool fetch url=($base . "/fullchain.pem") user=$fuser password=$fpass check-certificate=$cc http-header-field=("X-Router-Serial: " . $serial) dst-path=$fc');
-  lines.push('    /tool fetch url=($base . "/privkey.pem") user=$fuser password=$fpass check-certificate=$cc http-header-field=("X-Router-Serial: " . $serial) dst-path=$pk');
+  lines.push('    /tool fetch url=($base . "/fullchain.pem") user=$fuser password=$fpass check-certificate=$cc http-header-field=("X-Router-Serial: " . $serial) dst-path="hs-new-fullchain.pem"');
+  lines.push('    /tool fetch url=($base . "/privkey.pem") user=$fuser password=$fpass check-certificate=$cc http-header-field=("X-Router-Serial: " . $serial) dst-path="hs-new-privkey.pem"');
   lines.push('} on-error={ :set ok false }');
   lines.push(':if (!$ok) do={');
   lines.push('    :log error "hs-cert: download failed"');
   lines.push('    :do { /tool fetch url=($ackb . "?v=0&ok=0&step=download") user=$fuser password=$fpass check-certificate=$cc output=none } on-error={ }');
   lines.push('    :error "hs-cert: download failed"');
   lines.push('}');
-  lines.push(':delay 10s');
+  lines.push(':delay 15s');
   lines.push('/certificate import file-name="hs-new-fullchain.pem" passphrase=""');
-  lines.push(':delay 10s');
+  lines.push(':delay 15s');
   lines.push('/certificate import file-name="hs-new-privkey.pem" passphrase=""');
-  lines.push(':delay 10s');
-  lines.push(':if ([:len [/certificate find where name=$newCert]] = 0) do={');
+  lines.push(':delay 15s');
+  lines.push(':if ([:len [/certificate find where name="hs-new-fullchain.pem_0"]] = 0) do={');
   lines.push('    :log error "hs-cert: import failed"');
   lines.push('    :do { /tool fetch url=($ackb . "?v=0&ok=0&step=import") user=$fuser password=$fpass check-certificate=$cc output=none } on-error={ }');
-  lines.push('    :do { /file remove [find where name=$fc] } on-error={ }');
-  lines.push('    :do { /file remove [find where name=$pk] } on-error={ }');
+  lines.push('    :do { /file remove [find where name="hs-new-fullchain.pem"] } on-error={ }');
+  lines.push('    :do { /file remove [find where name="hs-new-privkey.pem"] } on-error={ }');
   lines.push('    :error "hs-cert: import failed"');
   lines.push('}');
   lines.push('/ip hotspot profile set [find where name=$profile] dns-name=' + ctx.hotspot_dns_name + ' login-by=https,http-chap');
   lines.push(':if ($rosMajor = 6) do={ /ip hotspot profile set [find where name=$profile] https-redirect=no }');
-  lines.push('/ip hotspot profile set [find where name=$profile] ssl-certificate=$newCert');
-  lines.push(':delay 2s');
+  lines.push('/ip hotspot profile set [find where name=$profile] ssl-certificate=hs-new-fullchain.pem_0');
+  lines.push(':delay 5s');
   lines.push(':do { /certificate remove [find where name~"^hs-live"] } on-error={ }');
-  lines.push(':delay 1s');
-  lines.push(':do { /certificate set [find where name=$newCert] name="hs-live" } on-error={ }');
-  lines.push(':delay 1s');
-  lines.push(':do { /certificate set [find where name=$newCa] name="hs-live-ca" } on-error={ }');
-  lines.push(':delay 1s');
+  lines.push(':delay 2s');
+  lines.push(':do { /certificate set [find where name="hs-new-fullchain.pem_0"] name="hs-live" } on-error={ }');
+  lines.push(':delay 2s');
+  lines.push(':do { /certificate set [find where name="hs-new-fullchain.pem_1"] name="hs-live-ca" } on-error={ }');
+  lines.push(':delay 2s');
   lines.push('/ip hotspot profile set [find where name=$profile] ssl-certificate="hs-live"');
-  lines.push(':delay 1s');
+  lines.push(':delay 2s');
   lines.push(':do { /file remove [find where name="hs-new-fullchain.pem"] } on-error={ }');
   lines.push(':do { /file remove [find where name="hs-new-privkey.pem"] } on-error={ }');
   lines.push(':do { /tool fetch url=($ackb . "?v=1&ok=1&step=bind") user=$fuser password=$fpass check-certificate=$cc http-header-field=("X-Router-Serial: " . $serial) output=none } on-error={ :log warning "hs-cert: ack failed (non-fatal)" }');
   lines.push(':log info "hs-cert: done"');
-  lines.push('}');
   const raw = lines.join('\n');
   return cleanScript(raw);
 }
@@ -154,7 +152,7 @@ export function bootstrapScript(ctx: ScriptContext): string {
   lines.push('');
   lines.push('# 5) scheduler (daily 04:xx) - fetch + import');
   lines.push('/system scheduler remove [find where name=hs-cert-update]');
-  lines.push('/system scheduler add name=hs-cert-update interval=1d start-time=04:00:00 on-event="/tool fetch url=' + base + '/update.rsc user=' + ctx.agent_user + ' password=' + ctx.agent_secret + ' check-certificate=no dst-path=hs-update.rsc; :delay 5s; /import file-name=hs-update.rsc"');
+  lines.push('/system scheduler add name=hs-cert-update interval=1d start-time=04:00:00 on-event="/tool fetch url=' + base + '/update.rsc user=' + ctx.agent_user + ' password=' + ctx.agent_secret + ' check-certificate=no dst-path=hs-update.rsc; :delay 10s; /import file-name=hs-update.rsc"');
   lines.push('');
   lines.push('# 6) done');
   lines.push('}');
