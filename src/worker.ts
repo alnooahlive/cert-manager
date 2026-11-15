@@ -4,7 +4,7 @@ import { issueCertificate } from './acme-issue';
 
 async function issueMissing() {
   // routers without any issued cert
-  const rows = await query(`SELECT r.id FROM routers r WHERE r.status='active' AND NOT EXISTS (SELECT 1 FROM certificates c WHERE c.router_id=r.id AND c.status='issued')`);
+  const rows = await query(`SELECT r.id FROM routers r WHERE r.status='active' AND NOT EXISTS (SELECT 1 FROM certificates c WHERE c.router_id=r.id AND c.status='issued') AND (r.issuing_at IS NULL OR r.issuing_at < now() - interval '3 minutes')`);
   for (const r of rows) {
     try {
       await Promise.race([

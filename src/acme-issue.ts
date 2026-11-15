@@ -28,9 +28,16 @@ async function deleteTxtRecord(id: string) {
 }
 
 export async function issueCertificate(routerId: string) {
+  // prevent concurrent issuance for the same router
+  const lock = await one('SELECT issuing_at FROM routers WHERE id=$1', [routerId]);
+  if (lock?.issuing_at && new Date(lock.issuing_at).getTime() > Date.now() - 180000) {
+    console.log('[acme] skipping', routerId, '- already issuing');
+    return { version: 0, notAfter: new Date(), skipped: true };
+  }
+  await query('UPDATE routers SET issuing_at=now() WHERE id=$1', [routerId]);
   console.log('[acme] starting issuance for router', routerId);
   const router = await one('SELECT * FROM routers WHERE id=$1', [routerId]);
-  if (!router) throw new Error('router not found');
+  if (!router) { await query('UPDATE routers SET issuing_at=NULL WHERE id=$1', [routerId]); throw new Error('router not found'); }
   const domain = router.hotspot_dns_name;
   const zone = process.env.CLOUDFLARE_ZONE_ID;
   console.log('[acme] domain:', domain, 'zone:', zone);
@@ -43,7 +50,9 @@ export async function issueCertificate(routerId: string) {
   const txtRecords: { id: string; name: string }[] = [];
 
   console.log('[acme] calling client.auto for', domain);
-  const certPem = await client.auto({
+  let certPem: any;
+  try {
+    certPem = await client.auto({
     csr,
     email: ACME_EMAIL,
     termsOfServiceAgreed: true,
@@ -54,33 +63,34 @@ export async function issueCertificate(routerId: string) {
       const id = await createTxtRecord(name, keyAuthorization);
       txtRecords.push({ id, name });
       console.log('[acme] TXT record created for', name, 'waiting for propagation...');
-      // wait for propagation (reduced from 15s to 8s)
       await new Promise(res => setTimeout(res, 8000));
     },
     challengeRemoveFn: async (authz: any, challenge: any, keyAuthorization: string) => {
-      // remove all created txt records
       for (const t of txtRecords) {
         try { await deleteTxtRecord(t.id); } catch {}
       }
       txtRecords.length = 0;
     },
   });
+  } catch (e: any) {
+    console.error('[acme] auto FAILED:', e.message);
+    // cleanup TXT records
+    for (const t of txtRecords) {
+      try { await deleteTxtRecord(t.id); } catch {}
+    }
+    txtRecords.length = 0;
+    await query('UPDATE routers SET issuing_at=NULL WHERE id=$1', [routerId]);
+    throw e;
+  }
 
-  // certPem is the certificate (PEM). Combine with key for fullchain? acme-client returns cert only.
-  // Build fullchain: cert + intermediate. client.getCertificate would include chain, but auto returns cert.
-  // We need the chain. Let's get it via getCertificate? auto returns the final cert. Use splitPemChain to add intermediates? 
-  // Simpler: store cert as fullchain (cert only) + key. Router imports both; fullchain may be just leaf. For hotspot, leaf is enough? Better to include chain.
-  // acme-client auto returns the certificate chain (leaf + intermediates) typically. Use as-is.
   console.log('[acme] auto completed, cert length:', certPem?.length);
   const fullchain = certPem.toString();
   const privkey = key.toString();
 
-  // parse not_after
   const info = acme.crypto.readCertificateInfo(Buffer.from(fullchain));
   const notAfter = info.notAfter ? new Date(info.notAfter) : new Date(Date.now() + 89 * 24 * 3600 * 1000);
   const notBefore = info.notBefore ? new Date(info.notBefore) : new Date();
 
-  // version
   const last = await one('SELECT COALESCE(MAX(version),0) AS v FROM certificates WHERE router_id=$1', [routerId]);
   const version = (last?.v || 0) + 1;
 
@@ -90,5 +100,7 @@ export async function issueCertificate(routerId: string) {
     [routerId, version, fullchain, privkey, notBefore, notAfter]
   );
 
+  await query('UPDATE routers SET issuing_at=NULL WHERE id=$1', [routerId]);
+  console.log('[acme] issuance completed for', routerId, 'version', version);
   return { version, notAfter };
 }
