@@ -134,7 +134,7 @@
       <input id="hotspot_profile" placeholder="hsprof1" />
       <label>مدة الاشتراك (أشهر)</label>
       <input id="subscription_months" type="number" value="1" min="1" />
-      <button class="btn primary" style="width:100%;margin-top:16px" onclick="addRouter()">حفظ وإضافة تلقائياً</button>
+      <button class="btn primary" style="width:100%;margin-top:16px" onclick="addRouter()">حفظ الراوتر (بدون إنشاء شهادة)</button>
       <div class="msg" id="msg"></div>
       <div id="agentInfo" style="display:none">
         <label>بيانات الوكيل (Agent):</label>
@@ -263,8 +263,10 @@ function renderTree(){
           <span style="color:var(--muted);font-size:12px">${esc(r.hotspot_local_ip)} · ${esc(r.hotspot_dns_name)}</span>
         </div>
         <div class="tree-meta">رقم: ${esc(r.network_number||'-')} · ROS: ${esc(r.ros_major||'-')} · تجديد: ${r.renewal_enabled?'مفعّل':'موقف'}</div>
+        <div id="certstat-${r.id}" class="dns-hint">جاري التحقق من الشهادة...</div>
         <div class="tree-actions">
           <button class="btn sm ghost" onclick="genScript('${r.id}')">سكربت (تلقائي)</button>
+          <button class="btn sm primary" onclick="issueServerCert('${r.id}')">🔐 إنشاء شهادة الخادم</button>
           <button class="btn sm ghost" onclick="viewAgent('${r.id}')">وكيل</button>
           ${statusButton(r)}
           <button class="btn sm ${r.renewal_enabled?'ghost':'primary'}" onclick="toggleRenewal('${r.id}',${!r.renewal_enabled})">${r.renewal_enabled?'إيقاف التجديد':'تفعيل التجديد'}</button>
@@ -299,8 +301,10 @@ function renderTree(){
           <span style="color:var(--muted);font-size:12px">${esc(r.hotspot_local_ip)} · ${esc(r.hotspot_dns_name)}</span>
         </div>
         <div class="tree-meta">رقم: ${esc(r.network_number||'-')} · ROS: ${esc(r.ros_major||'-')} · تجديد: ${r.renewal_enabled?'مفعّل':'موقف'}</div>
+        <div id="certstat-${r.id}" class="dns-hint">جاري التحقق من الشهادة...</div>
         <div class="tree-actions">
           <button class="btn sm ghost" onclick="genScript('${r.id}')">سكربت (تلقائي)</button>
+          <button class="btn sm primary" onclick="issueServerCert('${r.id}')">🔐 إنشاء شهادة الخادم</button>
           <button class="btn sm ghost" onclick="viewAgent('${r.id}')">وكيل</button>
           ${statusButton(r)}
           <button class="btn sm ${r.renewal_enabled?'ghost':'primary'}" onclick="toggleRenewal('${r.id}',${!r.renewal_enabled})">${r.renewal_enabled?'إيقاف التجديد':'تفعيل التجديد'}</button>
@@ -316,6 +320,7 @@ function renderTree(){
   document.getElementById('stActive').textContent=routers.filter(r=>r.status==='active').length;
   document.getElementById('stCust').textContent=customers.length;
   loadCertsIntoTree();
+  routers.forEach(r=>loadCertStatus(r.id));
 }
 
 function editCount(id){
@@ -352,6 +357,34 @@ async function delRouter(id){
 
 function esc(s){ return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
+async function loadCertStatus(id){
+  const el=document.getElementById('certstat-'+id);
+  if(!el) return;
+  try{
+    const s=await api('/api/routers/'+id+'/certificate');
+    if(s.valid){
+      el.innerHTML='🔐 شهادة صالحة — إصدار '+esc(s.version)+' · تنتهي '+new Date(s.notAfter).toLocaleDateString()+(s.source==='reused'?' (مُعاد استخدامها)':'');
+      el.style.color='var(--ok)';
+    }else{
+      el.innerHTML='⚠ لا توجد شهادة صالحة'+(s.lastError?' — '+esc(s.lastError):'')+' — اضغط «إنشاء شهادة الخادم»';
+      el.style.color='var(--warn)';
+    }
+  }catch(e){ el.textContent='تعذّر التحقق من الشهادة'; el.style.color='var(--danger)'; }
+}
+
+async function issueServerCert(id, force){
+  if(force && !confirm('فرض إنشاء شهادة جديدة؟ (سيتم تجاهل الشهادة الحالية)')) return;
+  toast('جاري التحقق من الشهادة...');
+  try{
+    const r=await api('/api/routers/'+id+'/issue',{method:'POST',body:JSON.stringify({force:!!force})});
+    if(r.status==='already-valid'){ toast('الشهادة صالحة بالفعل — لم يتم إنشاء شهادة جديدة'); }
+    else if(r.status==='reused'){ toast('تم استخدام الشهادة الموجودة بنفس النطاق ✅'); }
+    else if(r.status==='busy'){ toast('النطاق مشغول بإصدار آخر — أعد المحاولة','err'); }
+    else { toast('تم بدء تجهيز الشهادة...'); }
+    setTimeout(()=>{ load(); }, 6000);
+  }catch(e){ toast('خطأ: '+e.message,'err'); loadCertStatus(id); }
+}
+
 async function addRouter(){
   const msg=document.getElementById('msg'); msg.textContent=''; msg.className='msg';
   const body={
@@ -368,8 +401,8 @@ async function addRouter(){
     const res=await api('/api/routers',{method:'POST',body:JSON.stringify(body)});
     routers.unshift(res.router);
     renderTree();
-    msg.textContent='تمت الإضافة بنجاح ✅'; msg.className='msg ok';
-    toast('تمت الإضافة بنجاح');
+    msg.textContent='تمت الإضافة بنجاح ✅'+(res.cert&&res.cert.action==='reused'?' — تم ربط الشهادة الموجودة بنفس النطاق':' — اضغط «إنشاء شهادة الخادم» عند الحاجة'); msg.className='msg ok';
+    toast(res.cert&&res.cert.action==='reused'?'تم ربط الشهادة الموجودة ✅':'تمت الإضافة — أنشئ الشهادة من زر الراوتر');
     const info=document.getElementById('agentInfo'); info.style.display='block';
     document.getElementById('agentBox').textContent=`URL Token: ${res.agent.url_token}\nAgent User: ${res.agent.agent_user}\nAgent Secret: ${res.agent.agent_secret}\nBase: https://${location.hostname}/agent/v1/${res.agent.url_token}/`;
     ['network_name','network_number','hotspot_local_ip','hotspot_dns_name'].forEach(id=>document.getElementById(id).value='');
@@ -454,7 +487,7 @@ async function loadCertsIntoTree(){
       if(!cont) return;
       const div=document.createElement('div');
       div.className='tree-grand';
-      div.innerHTML='📜 v'+esc(x.version)+' · '+esc(x.status)+' · '+(x.not_after?new Date(x.not_after).toLocaleDateString():'-')+' · '+esc(x.source)+' <button class="btn sm ghost" style="margin-right:6px" onclick="toggleCertRenewal(\''+x.id+'\',${!x.renewal_enabled})">'+(x.renewal_enabled?'تجديد مفعّل':'تجديد موقف')+'</button> '+(x.status!=='revoked'?'<button class="btn sm ghost" onclick="revokeCert(\''+x.id+'\')">إيقاف</button>':'')+' <button class="btn sm danger" onclick="delCert(\''+x.id+'\')">حذف</button>';
+      div.innerHTML='📜 v'+esc(x.version)+' · '+esc(x.status)+' · '+(x.not_after?new Date(x.not_after).toLocaleDateString():'-')+' · '+esc(x.source)+' <button class="btn sm ghost" style="margin-right:6px" onclick="toggleCertRenewal(\''+x.id+'\',${!x.renewal_enabled})">'+(x.renewal_enabled?'تجديد مفعّل':'تجديد موقف')+'</button> <button class="btn sm primary" onclick="issueServerCert(\''+x.router_id+'\',true)">شهادة جديدة</button> '+(x.status!=='revoked'?'<button class="btn sm ghost" onclick="revokeCert(\''+x.id+'\')">إيقاف</button>':'')+' <button class="btn sm danger" onclick="delCert(\''+x.id+'\')">حذف</button>';
       cont.appendChild(div);
     });
   }catch{}

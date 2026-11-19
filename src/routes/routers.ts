@@ -3,7 +3,7 @@ import { query, one } from '../db';
 import { authMiddleware } from '../auth';
 import { generateUrlToken, generateAgentSecret } from '../acme';
 import { bootstrapScript, updateScript, allInOne, ScriptContext } from '../scripts';
-import { issueCertificate } from '../acme-issue';
+import { ensureCertificate, getCertStatus, tryReuseForRouter } from '../cert-service';
 
 const router = Router();
 router.use(authMiddleware);
@@ -40,9 +40,11 @@ router.post('/', async (req, res) => {
   const agent_user = 'agent_' + r.id.slice(0,8);
   const agent_secret = generateAgentSecret();
   await query('INSERT INTO agent_credentials(router_id,url_token,agent_user,agent_secret,reveal_until) VALUES($1,$2,$3,$4,now()+interval \'24 hours\')', [r.id, url_token, agent_user, agent_secret]);
-  // auto-issue certificate in background
-  issueCertificate(r.id).then(res => console.log('issued cert for', r.id, res)).catch(e => console.error('issue failed for', r.id, e.message));
-  res.json({ router: r, agent: { url_token, agent_user, agent_secret } });
+  // NO automatic ACME issuance. Only reuse an existing valid cert for the same domain.
+  let cert: any = null;
+  try { cert = await tryReuseForRouter(r.id); }
+  catch (e: any) { console.error('[router] reuse check failed', r.id, e.message); }
+  res.json({ router: r, agent: { url_token, agent_user, agent_secret }, cert });
 });
 
 router.patch('/:id', async (req, res) => {
@@ -145,10 +147,20 @@ ${ros === '6' ? '/ip hotspot profile set [find where name=' + r.hotspot_profile 
   res.type('text/plain').send(script);
 });
 
+// Check current certificate state (used by the UI button before any action)
+router.get('/:id/certificate', async (req, res) => {
+  res.json(await getCertStatus(req.params.id));
+});
+
+// Create server certificate: validates first, reuses same-domain cert, or issues new (never blind duplicate)
 router.post('/:id/issue', async (req, res) => {
-  // return immediately; run issuance in background
-  res.json({ ok: true, status: 'started' });
-  issueCertificate(req.params.id)
+  const force = req.body?.force === true;
+  const before = await getCertStatus(req.params.id);
+  if (!force && before.valid) {
+    return res.json({ ok: true, status: 'already-valid', certificate: before });
+  }
+  res.json({ ok: true, status: 'started', force });
+  ensureCertificate(req.params.id, { force })
     .then(r => console.log('[issue] completed for', req.params.id, r))
     .catch(e => console.error('[issue] FAILED for', req.params.id, e.message));
 });
