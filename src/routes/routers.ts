@@ -15,14 +15,15 @@ router.get('/', async (_req, res) => {
 });
 
 // One-time repair: force every router to the apex domain and attach a valid apex certificate (no ACME, no TXT)
-router.post('/force-apex', async (_req, res) => {
+router.post('/force-apex', async (req, res) => {
   const domain = FORCED_DOMAIN;
   const source = await one(
     `SELECT c.* FROM certificates c JOIN routers r ON r.id=c.router_id
      WHERE r.hotspot_dns_name=$1 AND c.status='issued' AND c.not_after>now()
      ORDER BY c.not_after DESC LIMIT 1`, [domain]);
   const rows = await query('SELECT id,hotspot_dns_name FROM routers');
-  const changed = rows.filter(r => r.hotspot_dns_name !== domain).map(r => r.id);
+  const explicit: string[] = Array.isArray(req.body?.router_ids) ? req.body.router_ids : [];
+  const changed = Array.from(new Set([...rows.filter(r => r.hotspot_dns_name !== domain).map(r => r.id), ...explicit]));
   if (!source && changed.length) return res.status(400).json({ error: 'لا توجد شهادة صالحة للنطاق الأساسي' });
   await query("INSERT INTO settings(key,value) VALUES('main_domain',$1) ON CONFLICT (key) DO UPDATE SET value=$1", [domain]);
   if (changed.length) {
