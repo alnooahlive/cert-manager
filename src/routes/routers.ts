@@ -4,6 +4,7 @@ import { authMiddleware } from '../auth';
 import { generateUrlToken, generateAgentSecret } from '../acme';
 import { bootstrapScript, updateScript, allInOne, ScriptContext } from '../scripts';
 import { ensureCertificate, getCertStatus, tryReuseForRouter } from '../cert-service';
+import { FORCED_DOMAIN } from '../config';
 
 const router = Router();
 router.use(authMiddleware);
@@ -13,21 +14,40 @@ router.get('/', async (_req, res) => {
   res.json(rows);
 });
 
+// One-time repair: force every router to the apex domain and attach a valid apex certificate (no ACME, no TXT)
+router.post('/force-apex', async (_req, res) => {
+  const domain = FORCED_DOMAIN;
+  const source = await one(
+    `SELECT c.* FROM certificates c JOIN routers r ON r.id=c.router_id
+     WHERE r.hotspot_dns_name=$1 AND c.status='issued' AND c.not_after>now()
+     ORDER BY c.not_after DESC LIMIT 1`, [domain]);
+  const rows = await query('SELECT id,hotspot_dns_name FROM routers');
+  const changed = rows.filter(r => r.hotspot_dns_name !== domain).map(r => r.id);
+  if (!source && changed.length) return res.status(400).json({ error: 'لا توجد شهادة صالحة للنطاق الأساسي' });
+  await query("INSERT INTO settings(key,value) VALUES('main_domain',$1) ON CONFLICT (key) DO UPDATE SET value=$1", [domain]);
+  if (changed.length) {
+    await query('UPDATE routers SET hotspot_dns_name=$1 WHERE hotspot_dns_name IS DISTINCT FROM $1', [domain]);
+  }
+  let certsReplaced = 0;
+  for (const cid of changed) {
+    await query("UPDATE certificates SET status='revoked',renewal_enabled=false WHERE router_id=$1 AND status='issued'", [cid]);
+    const last = await one('SELECT COALESCE(MAX(version),0) AS v FROM certificates WHERE router_id=$1', [cid]);
+    await query(
+      `INSERT INTO certificates(router_id,version,status,source,acme_managed,fullchain_pem,privkey_pem,not_before,not_after,renewal_enabled)
+       VALUES($1,$2,'issued','reused',true,$3,$4,$5,$6,true)`,
+      [cid, (last?.v || 0) + 1, source.fullchain_pem, source.privkey_pem, source.not_before, source.not_after]
+    );
+    certsReplaced++;
+  }
+  res.json({ ok: true, domain, routers: rows.length, renamed: changed.length, certsReplaced });
+});
+
 router.post('/', async (req, res) => {
   const b = req.body || {};
   if (!b.network_name && !b.router_name) return res.status(400).json({ error: 'network_name required' });
   if (!b.hotspot_local_ip) return res.status(400).json({ error: 'hotspot_local_ip required' });
-  // allow empty -> use main domain directly (no subdomain)
-  let dns = String(b.hotspot_dns_name || '').trim();
-  if (dns === '') {
-    const s = await one("SELECT value FROM settings WHERE key='main_domain'");
-    dns = s ? s.value : 'wifiy.link';
-  } else if (!dns.includes('.')) {
-    const s = await one("SELECT value FROM settings WHERE key='main_domain'");
-    const md = s ? s.value : 'wifiy.link';
-    dns = dns + '.' + md;
-  }
-  b.hotspot_dns_name = dns;
+  // unified apex domain: any subdomain input is ignored
+  b.hotspot_dns_name = FORCED_DOMAIN;
   const rows = await query(
     `INSERT INTO routers(customer_id,customer_name,phone,email,router_name,ros_major,hotspot_profile,hotspot_local_ip,hotspot_dns_name,subscription_months,network_name,network_number)
      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
@@ -49,6 +69,7 @@ router.post('/', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
   const b = req.body || {};
+  b.hotspot_dns_name = FORCED_DOMAIN;
   const row = await one(
     `UPDATE routers SET
        customer_id=COALESCE($1,customer_id),
