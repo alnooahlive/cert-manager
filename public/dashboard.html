@@ -536,8 +536,9 @@ async function verifyScript(){
   msg.textContent='جاري التحقق...'; msg.className='msg';
   try{
     const c=await api('/api/routers/'+currentScriptId+'/agent');
+    const rr=await api('/api/routers/'+currentScriptId);
     const b64=btoa(c.agent_user+':'+c.agent_secret);
-    const r=await fetch('/agent/v1/'+c.url_token+'/version.txt',{headers:{Authorization:'Basic '+b64}});
+    const r=await fetch('/agent/v1/'+c.url_token+'/version.txt',{headers:{Authorization:'Basic '+b64,'X-Router-Serial':rr.serial_number||''}});
     const t=await r.text();
     if(r.ok){ msg.textContent='✅ Agent reachable. Current version: '+t; msg.className='msg ok'; toast('التحقق ناجح'); }
     else { msg.textContent='⚠ Agent returned '+r.status; msg.className='msg err'; toast('فشل التحقق','err'); }

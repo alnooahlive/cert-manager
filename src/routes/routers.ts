@@ -116,7 +116,8 @@ router.get('/:id/scripts', async (req, res) => {
     url_token: cred.url_token,
     agent_user: cred.agent_user,
     agent_secret: cred.agent_secret,
-    template_version: '1',
+    template_version: '2',
+    expected_serial: r.serial_number || null,
   };
   res.json({
     ros,
