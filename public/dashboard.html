@@ -92,49 +92,26 @@
   <!-- Left: forms -->
   <div>
     <div class="card">
-      <h2>👤 إضافة عميل (مالك)</h2>
-      <label>اسم العميل</label>
-      <input id="c_name" placeholder="اسم العميل" />
+      <h2>➕ إضافة شبكة جديدة (كل المعلومات مرة واحدة)</h2>
       <div class="form-grid">
-        <div>
-          <label>الهاتف</label>
-          <input id="c_phone" placeholder="+964..." />
-        </div>
-        <div>
-          <label>البريد</label>
-          <input id="c_email" placeholder="email@example.com" />
-        </div>
+        <div><label>اسم مالك الشبكة</label><input id="n_owner" placeholder="اسم المالك" /></div>
+        <div><label>هاتف المالك</label><input id="n_phone" placeholder="+964..." /></div>
       </div>
-      <label>عدد الروترات (قابل للتعديل لاحقاً)</label>
-      <input id="c_count" type="number" value="1" min="1" />
-      <button class="btn primary" style="width:100%;margin-top:16px" onclick="addCustomer()">حفظ العميل</button>
-      <div class="msg" id="cmsg"></div>
-    </div>
-
-    <div class="card">
-      <h2>➕ إضافة موجه (Router)</h2>
-      <label>العميل (المالك)</label>
-      <select id="customer_id"><option value="">-- بدون عميل --</option></select>
+      <label>بريد المالك (اختياري)</label>
+      <input id="n_email" placeholder="email@example.com" />
+      <div style="height:1px;background:var(--border);margin:16px 0"></div>
       <label>اسم الشبكة</label>
-      <input id="network_name" placeholder="مثال: cafenet" />
+      <input id="n_name" placeholder="مثال: cafenet" />
       <div class="form-grid">
-        <div>
-          <label>رقم الشبكة</label>
-          <input id="network_number" placeholder="مثال: 1" />
-        </div>
-        <div>
-          <label>IP المحلي للموجه</label>
-          <input id="hotspot_local_ip" placeholder="192.168.88.1" />
-        </div>
+        <div><label>رقم الشبكة</label><input id="n_number" placeholder="مثال: 1" /></div>
+        <div><label>IP المحلي للموجه</label><input id="n_ip" placeholder="192.168.88.1" /></div>
       </div>
-      <label>النطاق (موحّد لكل الشبكات والروترات)</label>
-      <input id="hotspot_dns_name" value="wifiy.link" disabled style="opacity:.8" />
-      <div class="dns-hint">النتيجة: <span id="dnsHint">wifiy.link</span> — بدون أي نطاق فرعي</div>
-      <label>ملف Hotspot Profile</label>
-      <input id="hotspot_profile" placeholder="hsprof1" />
-      <label>مدة الاشتراك (أشهر)</label>
-      <input id="subscription_months" type="number" value="1" min="1" />
-      <button class="btn primary" style="width:100%;margin-top:16px" onclick="addRouter()">حفظ الراوتر (بدون إنشاء شهادة)</button>
+      <div class="form-grid">
+        <div><label>ملف Hotspot Profile</label><input id="n_profile" value="hsprof1" /></div>
+        <div><label>مدة الاشتراك (أشهر)</label><input id="n_months" type="number" value="1" min="1" /></div>
+      </div>
+      <div class="dns-hint" style="margin-top:10px">النطاق: <span>wifiy.link</span> — موحّد لكل الشبكات، بدون نطاق فرعي</div>
+      <button class="btn primary" style="width:100%;margin-top:16px" onclick="saveNetwork()">حفظ الشبكة وإنشاء السكربت</button>
       <div class="msg" id="msg"></div>
       <div id="agentInfo" style="display:none">
         <label>بيانات الوكيل (Agent):</label>
@@ -165,6 +142,33 @@
       <div id="tree"></div>
       <div class="empty" id="treeEmpty" style="display:none"><div class="icon">📡</div>لا توجد بيانات</div>
     </div>
+  </div>
+</div>
+
+<!-- Edit network modal -->
+<div class="modal-back" id="editModal">
+  <div class="modal">
+    <h3>✏️ تعديل بيانات الشبكة</h3>
+    <div class="form-grid">
+      <div><label>اسم مالك الشبكة</label><input id="e_owner" /></div>
+      <div><label>هاتف المالك</label><input id="e_phone" /></div>
+    </div>
+    <label>بريد المالك</label><input id="e_email" />
+    <label>اسم الشبكة</label><input id="e_name" />
+    <div class="form-grid">
+      <div><label>رقم الشبكة</label><input id="e_number" /></div>
+      <div><label>IP المحلي للموجه</label><input id="e_ip" /></div>
+    </div>
+    <div class="form-grid">
+      <div><label>ملف Hotspot Profile</label><input id="e_profile" /></div>
+      <div><label>مدة الاشتراك (أشهر)</label><input id="e_months" type="number" min="1" /></div>
+    </div>
+    <div class="dns-hint" style="margin-top:10px">النطاق: <span>wifiy.link</span> — غير قابل للتعديل</div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn primary" onclick="saveNetworkEdit()">حفظ التعديلات</button>
+      <button class="btn ghost" onclick="closeEditModal()">إغلاق</button>
+    </div>
+    <div class="msg" id="emsg"></div>
   </div>
 </div>
 
@@ -210,16 +214,7 @@ async function load(){
     routers=await api('/api/routers');
     document.getElementById('user').textContent='admin@alnooah.pro';
     renderTree(); loadCertsCount(); loadCertsIntoTree();
-    populateCustomerSelect();
   }catch(e){ if(e.message.includes('401')||e.message.includes('unauthorized')){localStorage.removeItem('token');location.href='/login';} }
-}
-
-function populateCustomerSelect(){
-  const sel=document.getElementById('customer_id');
-  const cur=sel.value;
-  sel.innerHTML='<option value="">-- بدون عميل --</option>';
-  customers.forEach(c=>{ const o=document.createElement('option'); o.value=c.id; o.textContent=c.name+' ('+c.router_count+')'; sel.appendChild(o); });
-  sel.value=cur;
 }
 
 function statusButton(r){
@@ -262,6 +257,7 @@ function renderTree(){
         <div id="certstat-${r.id}" class="dns-hint">جاري التحقق من الشهادة...</div>
         <div class="tree-actions">
           <button class="btn sm ghost" onclick="genScript('${r.id}')">سكربت (تلقائي)</button>
+          <button class="btn sm ghost" onclick="editNetwork('${r.id}')">✏️ تعديل</button>
           <button class="btn sm primary" onclick="issueServerCert('${r.id}')">🔐 إنشاء شهادة الخادم</button>
           <button class="btn sm ghost" onclick="viewAgent('${r.id}')">وكيل</button>
           ${statusButton(r)}
@@ -300,6 +296,7 @@ function renderTree(){
         <div id="certstat-${r.id}" class="dns-hint">جاري التحقق من الشهادة...</div>
         <div class="tree-actions">
           <button class="btn sm ghost" onclick="genScript('${r.id}')">سكربت (تلقائي)</button>
+          <button class="btn sm ghost" onclick="editNetwork('${r.id}')">✏️ تعديل</button>
           <button class="btn sm primary" onclick="issueServerCert('${r.id}')">🔐 إنشاء شهادة الخادم</button>
           <button class="btn sm ghost" onclick="viewAgent('${r.id}')">وكيل</button>
           ${statusButton(r)}
@@ -329,13 +326,6 @@ async function saveCountDirect(id,val){
   try{ await api('/api/customers/'+id,{method:'PATCH',body:JSON.stringify({router_count:val})}); toast('تم حفظ العدد'); load(); }catch(e){ toast('خطأ: '+e.message,'err'); }
 }
 async function delCustomer(id){ if(!confirm('حذف العميل؟')) return; try{ await api('/api/customers/'+id,{method:'DELETE'}); toast('تم الحذف'); load(); }catch(e){ toast('خطأ: '+e.message,'err'); } }
-
-async function addCustomer(){
-  const msg=document.getElementById('cmsg'); msg.textContent=''; msg.className='msg';
-  const body={ name: document.getElementById('c_name').value.trim(), phone: document.getElementById('c_phone').value.trim(), email: document.getElementById('c_email').value.trim(), router_count: parseInt(document.getElementById('c_count').value,10)||1 };
-  if(!body.name){ msg.textContent='اسم العميل مطلوب'; msg.className='msg err'; return; }
-  try{ await api('/api/customers',{method:'POST',body:JSON.stringify(body)}); msg.textContent='تم حفظ العميل ✅'; msg.className='msg ok'; toast('تم حفظ العميل'); ['c_name','c_phone','c_email'].forEach(id=>document.getElementById(id).value=''); document.getElementById('c_count').value=1; load(); }catch(e){ msg.textContent='خطأ: '+e.message; msg.className='msg err'; }
-}
 
 async function setRos(id,val){
   try{ await api('/api/routers/'+id,{method:'PATCH',body:JSON.stringify({ros_major: val?parseInt(val,10):null})}); toast('تم تحديث الإصدار'); }catch(e){ toast('خطأ: '+e.message,'err'); }
@@ -381,30 +371,59 @@ async function issueServerCert(id, force){
   }catch(e){ toast('خطأ: '+e.message,'err'); loadCertStatus(id); }
 }
 
-async function addRouter(){
-  const msg=document.getElementById('msg'); msg.textContent=''; msg.className='msg';
-  const body={
-    customer_id: document.getElementById('customer_id').value || null,
-    network_name: document.getElementById('network_name').value.trim(),
-    network_number: document.getElementById('network_number').value.trim(),
-    hotspot_local_ip: document.getElementById('hotspot_local_ip').value.trim(),
-    hotspot_dns_name: 'wifiy.link',
-    hotspot_profile: document.getElementById('hotspot_profile').value.trim()||'hsprof1',
-    subscription_months: parseInt(document.getElementById('subscription_months').value,10)||1,
+function networkBody(prefix){
+  const g=id=>document.getElementById(prefix+id).value.trim();
+  return {
+    owner_name: g('owner'), owner_phone: g('phone'), owner_email: g('email'),
+    network_name: g('name'), network_number: g('number'),
+    hotspot_local_ip: g('ip'), hotspot_profile: g('profile')||'hsprof1',
+    subscription_months: parseInt(g('months'),10)||1,
   };
-  if(!body.network_name||!body.hotspot_local_ip){ msg.textContent='يرجى تعبئة الحقول المطلوبة'; msg.className='msg err'; return; }
+}
+
+async function saveNetwork(){
+  const msg=document.getElementById('msg'); msg.textContent=''; msg.className='msg';
+  const body=networkBody('n_');
+  if(!body.network_name||!body.hotspot_local_ip){ msg.textContent='يرجى تعبئة اسم الشبكة و IP المحلي'; msg.className='msg err'; return; }
   try{
-    const res=await api('/api/routers',{method:'POST',body:JSON.stringify(body)});
+    const res=await api('/api/networks',{method:'POST',body:JSON.stringify(body)});
     routers.unshift(res.router);
+    if(res.customer) customers.unshift(res.customer);
     renderTree();
-    msg.textContent='تمت الإضافة بنجاح ✅'+(res.cert&&res.cert.action==='reused'?' — تم ربط الشهادة الموجودة بنفس النطاق':' — اضغط «إنشاء شهادة الخادم» عند الحاجة'); msg.className='msg ok';
-    toast(res.cert&&res.cert.action==='reused'?'تم ربط الشهادة الموجودة ✅':'تمت الإضافة — أنشئ الشهادة من زر الراوتر');
+    msg.textContent='تمت إضافة الشبكة بكل بياناتها ✅ — السكربت جاهز'; msg.className='msg ok';
+    toast('تمت الإضافة وإنشاء السكربت ✅');
     const info=document.getElementById('agentInfo'); info.style.display='block';
     document.getElementById('agentBox').textContent=`URL Token: ${res.agent.url_token}\nAgent User: ${res.agent.agent_user}\nAgent Secret: ${res.agent.agent_secret}\nBase: https://${location.hostname}/agent/v1/${res.agent.url_token}/`;
-    ['network_name','network_number','hotspot_local_ip','hotspot_dns_name'].forEach(id=>document.getElementById(id).value='');
-    updateDnsHint();
+    ['owner','phone','email','name','number','ip'].forEach(k=>document.getElementById('n_'+k).value='');
     setTimeout(()=>genScript(res.router.id), 300);
   }catch(e){ msg.textContent='خطأ: '+e.message; msg.className='msg err'; toast('خطأ: '+e.message,'err'); }
+}
+
+let editingId=null;
+async function editNetwork(id){
+  editingId=id;
+  const em=document.getElementById('emsg'); em.textContent='';
+  try{
+    const d=await api('/api/networks/'+id);
+    const r=d.router,c=d.customer||{};
+    const vals={
+      owner:c.name||r.customer_name||'', phone:c.phone||r.phone||'', email:c.email||r.email||'',
+      name:r.network_name||r.router_name||'', number:r.network_number||'',
+      ip:r.hotspot_local_ip||'', profile:r.hotspot_profile||'', months:r.subscription_months||1,
+    };
+    Object.keys(vals).forEach(k=>document.getElementById('e_'+k).value=vals[k]);
+    document.getElementById('editModal').style.display='flex';
+  }catch(e){ toast('خطأ: '+e.message,'err'); }
+}
+function closeEditModal(){ document.getElementById('editModal').style.display='none'; }
+async function saveNetworkEdit(){
+  if(!editingId) return;
+  const em=document.getElementById('emsg'); em.textContent='';
+  const body=networkBody('e_');
+  try{
+    await api('/api/networks/'+editingId,{method:'PATCH',body:JSON.stringify(body)});
+    closeEditModal(); toast('تم حفظ التعديلات ✅'); load();
+  }catch(e){ em.textContent='خطأ: '+e.message; em.className='msg err'; }
 }
 
 async function viewAgent(id){
