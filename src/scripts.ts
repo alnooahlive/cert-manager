@@ -116,7 +116,7 @@ export function updateScript(ctx: ScriptContext): string {
   lines.push('    :error "hs-cert: import failed"');
   lines.push('}');
   lines.push('/ip hotspot profile set [find where name=$profile] dns-name=' + ctx.hotspot_dns_name + ' login-by=https,http-chap');
-  lines.push(':if ($rosMajor = 6) do={ /ip hotspot profile set [find where name=$profile] https-redirect=no }');
+  lines.push('/ip hotspot profile set [find where name=$profile] https-redirect=yes');
   lines.push('/ip hotspot profile set [find where name=$profile] ssl-certificate=hs-new-fullchain.pem_0');
   lines.push(':delay 5s');
   lines.push(':do { /certificate remove [find where name~"^hs-live"] } on-error={ }');
@@ -126,6 +126,8 @@ export function updateScript(ctx: ScriptContext): string {
   lines.push(':do { /certificate set [find where name="hs-new-fullchain.pem_1"] name="hs-live-ca" } on-error={ }');
   lines.push(':delay 2s');
   lines.push('/ip hotspot profile set [find where name=$profile] ssl-certificate="hs-live"');
+  lines.push(':delay 2s');
+  lines.push(':do { /ip service set www-ssl certificate=hs-live disabled=no } on-error={ :log warning "hs-cert: www-ssl certificate bind failed" }');
   lines.push(':delay 2s');
   lines.push(':do { /file remove [find where name="hs-new-fullchain.pem"] } on-error={ }');
   lines.push(':do { /file remove [find where name="hs-new-privkey.pem"] } on-error={ }');
@@ -150,7 +152,7 @@ export function bootstrapScript(ctx: ScriptContext): string {
   lines.push('');
   lines.push('# 2) hotspot profile');
   lines.push('/ip hotspot profile set [find where name=' + ctx.hotspot_profile + '] dns-name=' + ctx.hotspot_dns_name + ' login-by=https,http-chap');
-  lines.push(':if ($rosMajor = 6) do={ /ip hotspot profile set [find where name=' + ctx.hotspot_profile + '] https-redirect=no }');
+  lines.push('/ip hotspot profile set [find where name=' + ctx.hotspot_profile + '] https-redirect=yes');
   lines.push('');
   lines.push('# 3) fetch update script from server');
   lines.push(':local waited 0');
