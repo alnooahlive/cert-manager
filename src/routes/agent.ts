@@ -14,6 +14,14 @@ async function resolve(token: string, providedSerial?: string) {
   return { cred, router: r };
 }
 
+async function isSerialMismatch(token: string, serial?: string) {
+  if (!serial) return false;
+  const cred: any = await one('SELECT router_id FROM agent_credentials WHERE url_token=$1', [token]);
+  if (!cred) return false;
+  const r: any = await one('SELECT serial_number FROM routers WHERE id=$1', [cred.router_id]);
+  return !!(r?.serial_number && r.serial_number !== serial);
+}
+
 function checkAuth(req: any, cred: any) {
   const auth = req.headers.authorization;
   if (auth && auth.startsWith('Basic ')) {
@@ -38,7 +46,10 @@ function getSerial(req: any): string | undefined {
 router.get('/:token/version.txt', async (req, res) => {
   const serial = getSerial(req);
   const ctx = await resolve(req.params.token, serial);
-  if (!ctx) return res.status(404).send('not found');
+  if (!ctx) {
+    const mismatch = await isSerialMismatch(req.params.token, serial);
+    return res.status(mismatch ? 403 : 404).send(mismatch ? 'serial mismatch — reset serial from the dashboard' : 'not found');
+  }
   if (!checkAuth(req, ctx.cred)) return res.status(403).send('forbidden');
   const cert = await one('SELECT version FROM shared_certificate WHERE id=1 AND status=\'issued\'');
   const ver = cert ? String(cert.version) : '0';
@@ -48,7 +59,10 @@ router.get('/:token/version.txt', async (req, res) => {
 router.get('/:token/fullchain.pem', async (req, res) => {
   const serial = getSerial(req);
   const ctx = await resolve(req.params.token, serial);
-  if (!ctx) return res.status(404).send('not found');
+  if (!ctx) {
+    const mismatch = await isSerialMismatch(req.params.token, serial);
+    return res.status(mismatch ? 403 : 404).send(mismatch ? 'serial mismatch — reset serial from the dashboard' : 'not found');
+  }
   if (!checkAuth(req, ctx.cred)) return res.status(403).send('forbidden');
   const cert = await one('SELECT fullchain_pem FROM shared_certificate WHERE id=1 AND status=\'issued\'');
   res.type('text/plain').send(cert?.fullchain_pem || '');
@@ -57,7 +71,10 @@ router.get('/:token/fullchain.pem', async (req, res) => {
 router.get('/:token/privkey.pem', async (req, res) => {
   const serial = getSerial(req);
   const ctx = await resolve(req.params.token, serial);
-  if (!ctx) return res.status(404).send('not found');
+  if (!ctx) {
+    const mismatch = await isSerialMismatch(req.params.token, serial);
+    return res.status(mismatch ? 403 : 404).send(mismatch ? 'serial mismatch — reset serial from the dashboard' : 'not found');
+  }
   if (!checkAuth(req, ctx.cred)) return res.status(403).send('forbidden');
   const cert = await one('SELECT privkey_pem FROM shared_certificate WHERE id=1 AND status=\'issued\'');
   res.type('text/plain').send(cert?.privkey_pem || '');
@@ -66,7 +83,10 @@ router.get('/:token/privkey.pem', async (req, res) => {
 router.get('/:token/update.rsc', async (req, res) => {
   const serial = getSerial(req);
   const ctx = await resolve(req.params.token, serial);
-  if (!ctx) return res.status(404).send('not found');
+  if (!ctx) {
+    const mismatch = await isSerialMismatch(req.params.token, serial);
+    return res.status(mismatch ? 403 : 404).send(mismatch ? 'serial mismatch — reset serial from the dashboard' : 'not found');
+  }
   if (!checkAuth(req, ctx.cred)) return res.status(403).send('forbidden');
   const router = await one('SELECT * FROM routers WHERE id=$1', [ctx.cred.router_id]);
   const agent_host = process.env.AGENT_HOST || 'hotspotmikrotik.alnooah.pro';
@@ -131,7 +151,10 @@ router.get('/:token/bootstrap.rsc', async (req, res) => {
 router.get('/:token/ack', async (req, res) => {
   const serial = getSerial(req);
   const ctx = await resolve(req.params.token, serial);
-  if (!ctx) return res.status(404).send('not found');
+  if (!ctx) {
+    const mismatch = await isSerialMismatch(req.params.token, serial);
+    return res.status(mismatch ? 403 : 404).send(mismatch ? 'serial mismatch — reset serial from the dashboard' : 'not found');
+  }
   if (!checkAuth(req, ctx.cred)) return res.status(403).send('forbidden');
   const v = parseInt(req.query.v as string, 10) || 0;
   const ok = req.query.ok === '1';

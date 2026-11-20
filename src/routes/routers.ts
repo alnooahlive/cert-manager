@@ -87,6 +87,12 @@ router.get('/:id', async (req, res) => {
   res.json(row);
 });
 
+// Clear serial binding when a router is replaced or its software-id changes
+router.post('/:id/reset-serial', async (req, res) => {
+  await query('UPDATE routers SET serial_number=NULL,serial_verified=false WHERE id=$1', [req.params.id]);
+  res.json({ ok: true });
+});
+
 router.get('/:id/agent', async (req, res) => {
   const cred = await one('SELECT url_token, agent_user, agent_secret, reveal_until FROM agent_credentials WHERE router_id=$1', [req.params.id]);
   if (!cred) return res.status(404).json({ error: 'not found' });

@@ -1,8 +1,7 @@
-import fs from 'fs';
-import path from 'path';
 import pool from './db';
 import app from './server';
 import { hashPassword } from './auth';
+import { runMigrations } from './migration-runner';
 
 // env validation
 function validateEnv() {
@@ -14,37 +13,31 @@ function validateEnv() {
   }
 }
 
-async function runMigrations() {
+async function bootstrap() {
   try {
-    const dir = path.join(process.cwd(), 'migrations');
-    if (!fs.existsSync(dir)) return;
-    const files = fs.readdirSync(dir).filter(f => f.endsWith('.sql')).sort();
-    for (const f of files) {
-      const sql = fs.readFileSync(path.join(dir, f), 'utf8');
-      console.log('running migration', f);
-      await pool.query(sql);
-    }
-    console.log('migrations done');
-    // seed admin if none
+    await runMigrations(pool);
+    // Seed admin only when missing. Manual password changes survive deployments.
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@alnooah.pro';
     const adminPassword = process.env.ADMIN_PASSWORD || 'Admin123!ChangeMe';
-    const hash = await hashPassword(adminPassword);
     const existing = await pool.query('SELECT id FROM users WHERE email=$1', [adminEmail]);
     if (existing.rows.length === 0) {
+      const hash = await hashPassword(adminPassword);
       await pool.query('INSERT INTO users(email,password_hash) VALUES($1,$2)', [adminEmail, hash]);
       console.log('seeded admin:', adminEmail);
-    } else {
+    }
+    if (process.env.ADMIN_RESET_PASSWORD === 'true') {
+      const hash = await hashPassword(adminPassword);
       await pool.query('UPDATE users SET password_hash=$1 WHERE email=$2', [hash, adminEmail]);
-      console.log('updated admin password:', adminEmail);
+      console.log('admin password reset by env flag');
     }
   } catch (e) {
-    console.error('migration error', e);
+    console.error('bootstrap error', e);
   }
 }
 
 async function main() {
   validateEnv();
-  await runMigrations();
+  await bootstrap();
   const port = parseInt(process.env.PORT || '3000', 10);
   const server = app.listen(port, () => {
     console.log(`cert-manager listening on ${port}`);

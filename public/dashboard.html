@@ -129,10 +129,19 @@
       <div class="dns-hint" id="sharedCertStatus">جارٍ التحقق...</div>
       <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
         <button class="btn primary" onclick="issueSharedCert(false)" id="sharedIssueBtn">🔐 إنشاء الشهادة المشتركة</button>
-        <button class="btn ghost" onclick="issueSharedCert(true)">🔄 تجديد</button>
+        <button class="btn ghost" id="sharedRenewBtn" onclick="issueSharedCert(true)">🔄 تجديد</button>
       </div>
       <div class="msg" id="sharedMsg"></div>
       <div class="dns-hint" style="margin-top:8px">تُنسَخ هذه الشهادة تلقائياً لكل الراوترات عبر الوكيل — لا تُصدر شهادة لكل راوتر على حدة.</div>
+      <div style="height:1px;background:var(--border);margin:14px 0"></div>
+      <label>فحص إعدادات Cloudflare DNS</label>
+      <div class="dns-hint" id="dnsAudit">لم يُفحص بعد</div>
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <button class="btn ghost" onclick="auditDns()">🔍 فحص DNS</button>
+        <button class="btn primary" onclick="repairDns()">🛠 إصلاح تلقائي</button>
+      </div>
+      <div class="dns-hint" id="agentCertStatus" style="margin-top:10px">شهادة خادم الوكيل: جارٍ الفحص...</div>
+      <div class="dns-hint" style="margin-top:8px">ملاحظة: وضع SSL (Full strict) وخيار «Always Use HTTPS» يُضبطان يدوياً من لوحة Cloudflare؛ الرمز المتاح لا يملك صلاحية تغيير إعدادات المنطقة.</div>
     </div>
   </div>
 
@@ -222,7 +231,7 @@ async function load(){
     customers=await api('/api/customers');
     routers=await api('/api/routers');
     document.getElementById('user').textContent='admin@alnooah.pro';
-    renderTree(); loadCertsCount(); loadCertsIntoTree(); loadSharedCert();
+    renderTree(); loadCertsCount(); loadCertsIntoTree(); loadSharedCert(); loadAgentCert();
   }catch(e){ if(e.message.includes('401')||e.message.includes('unauthorized')){localStorage.removeItem('token');location.href='/login';} }
 }
 
@@ -260,7 +269,8 @@ function renderTree(){
           <span style="font-size:16px">📡</span>
           <strong>${esc(r.network_name||r.router_name||'-')}</strong>
           <span class="badge ${r.status==='active'?'active':'pending'}">${esc(r.status)}</span>
-          <span style="color:var(--muted);font-size:12px">${esc(r.hotspot_local_ip)} · ${esc(r.hotspot_dns_name)}</span>
+          ${!r.cert_applied_version?'<span class="badge pending" title="انسخ السكربت وطبّقه على الراوتر مرة واحدة">⚠ لم يُطبّق السكربت</span>':''}
+           <span style="color:var(--muted);font-size:12px">${esc(r.hotspot_local_ip)} · ${esc(r.hotspot_dns_name)}</span>
         </div>
         <div class="tree-meta">رقم: ${esc(r.network_number||'-')} · ROS: ${esc(r.ros_major||'-')} · تجديد: ${r.renewal_enabled?'مفعّل':'موقف'}</div>
         <div id="certstat-${r.id}" class="dns-hint">جاري التحقق من الشهادة...</div>
@@ -268,6 +278,7 @@ function renderTree(){
           <button class="btn sm ghost" onclick="genScript('${r.id}')">سكربت (تلقائي)</button>
           <button class="btn sm ghost" onclick="editNetwork('${r.id}')">✏️ تعديل</button>
           <button class="btn sm ghost" onclick="viewAgent('${r.id}')">وكيل</button>
+          <button class="btn sm ghost" onclick="resetSerial('${r.id}')">إعادة تعيين السريال</button>
           ${statusButton(r)}
           <button class="btn sm ${r.renewal_enabled?'ghost':'primary'}" onclick="toggleRenewal('${r.id}',${!r.renewal_enabled})">${r.renewal_enabled?'إيقاف التجديد':'تفعيل التجديد'}</button>
           <button class="btn sm danger" onclick="delRouter('${r.id}')">حذف</button>
@@ -298,7 +309,8 @@ function renderTree(){
           <span style="font-size:16px">📡</span>
           <strong>${esc(r.network_name||r.router_name||'-')}</strong>
           <span class="badge ${r.status==='active'?'active':'pending'}">${esc(r.status)}</span>
-          <span style="color:var(--muted);font-size:12px">${esc(r.hotspot_local_ip)} · ${esc(r.hotspot_dns_name)}</span>
+          ${!r.cert_applied_version?'<span class="badge pending" title="انسخ السكربت وطبّقه على الراوتر مرة واحدة">⚠ لم يُطبّق السكربت</span>':''}
+           <span style="color:var(--muted);font-size:12px">${esc(r.hotspot_local_ip)} · ${esc(r.hotspot_dns_name)}</span>
         </div>
         <div class="tree-meta">رقم: ${esc(r.network_number||'-')} · ROS: ${esc(r.ros_major||'-')} · تجديد: ${r.renewal_enabled?'مفعّل':'موقف'}</div>
         <div id="certstat-${r.id}" class="dns-hint">جاري التحقق من الشهادة...</div>
@@ -306,6 +318,7 @@ function renderTree(){
           <button class="btn sm ghost" onclick="genScript('${r.id}')">سكربت (تلقائي)</button>
           <button class="btn sm ghost" onclick="editNetwork('${r.id}')">✏️ تعديل</button>
           <button class="btn sm ghost" onclick="viewAgent('${r.id}')">وكيل</button>
+          <button class="btn sm ghost" onclick="resetSerial('${r.id}')">إعادة تعيين السريال</button>
           ${statusButton(r)}
           <button class="btn sm ${r.renewal_enabled?'ghost':'primary'}" onclick="toggleRenewal('${r.id}',${!r.renewal_enabled})">${r.renewal_enabled?'إيقاف التجديد':'تفعيل التجديد'}</button>
           <button class="btn sm danger" onclick="delRouter('${r.id}')">حذف</button>
@@ -383,18 +396,55 @@ async function loadSharedCert(){
 async function issueSharedCert(force){
   if(force && !confirm('تجديد الشهادة المشتركة الآن؟ (سيتم إصدار شهادة واحدة للنطاق)')) return;
   const m=document.getElementById('sharedMsg'); m.textContent='جارٍ العمل...'; m.className='msg';
-  const btn=document.getElementById('sharedIssueBtn'); if(btn) btn.disabled=true;
+  const btn=document.getElementById('sharedIssueBtn'); const rbtn=document.getElementById('sharedRenewBtn');
+  if(btn) btn.disabled=true; if(rbtn) rbtn.disabled=true;
   try{
     const r=await api('/api/shared-certificate/issue',{method:'POST',body:JSON.stringify({force:!!force})});
     if(r.status==='already-valid'){ m.textContent='الشهادة المشتركة صالحة بالفعل — لم يُصدر شيء'; m.className='msg ok'; toast('الشهادة صالحة بالفعل'); }
-    else if(r.status==='busy'){ m.textContent='النطاق مشغول — أعد المحاولة لاحقاً'; m.className='msg err'; toast('النطاق مشغول','err'); }
+    else if(r.status==='busy'){ const txt=r.message||'النطاق مشغول — أعد المحاولة لاحقاً'; m.textContent=txt; m.className='msg err'; toast(txt,'err'); }
     else { m.textContent='تم إصدار الشهادة المشتركة ✅ — ستُنسَخ لكل الراوترات تلقائياً'; m.className='msg ok'; toast('تم إصدار الشهادة المشتركة ✅'); }
   }catch(e){ m.textContent='خطأ: '+e.message; m.className='msg err'; toast('خطأ: '+e.message,'err'); }
-  finally{ if(btn) btn.disabled=false; }
-  setTimeout(()=>{ loadSharedCert(); routers.forEach(r=>loadCertStatus(r.id)); }, 2000);
+  finally{ if(btn) btn.disabled=false; if(rbtn) rbtn.disabled=false; }
+  loadSharedCert(); routers.forEach(r=>loadCertStatus(r.id));
 }
 
 async function issueServerCert(id, force){ return issueSharedCert(force); }
+
+async function loadAgentCert(){
+  const el=document.getElementById('agentCertStatus'); if(!el) return;
+  try{
+    const c=await api('/health/agent-cert');
+    if(c.ok) el.innerHTML='✅ شهادة خادم الوكيل صالحة — تنتهي '+new Date(c.notAfter).toLocaleDateString()+' (باقي '+c.daysLeft+' يوم)';
+    else el.innerHTML='⚠ شهادة خادم الوكيل: '+(c.error||('باقي '+c.daysLeft+' يوم فقط — جدّدها من Cloudflare'));
+    el.style.color=c.ok?'var(--ok)':'var(--warn)';
+  }catch(e){ el.textContent='تعذّر فحص شهادة الوكيل'; }
+}
+
+async function auditDns(){
+  const el=document.getElementById('dnsAudit'); el.textContent='جارٍ الفحص...';
+  try{
+    const d=await api('/api/cloudflare/audit');
+    el.innerHTML=d.ok?'✅ الإعدادات سليمة — سجل A واحد ومحمي، بلا سجلات زائدة'
+      :'⚠ '+d.issues.map(esc).join(' · ');
+    el.style.color=d.ok?'var(--ok)':'var(--warn)';
+  }catch(e){ el.textContent='خطأ: '+e.message; el.style.color='var(--danger)'; }
+}
+async function repairDns(){
+  if(!confirm('إصلاح سجلات DNS تلقائياً؟ (حذف السجلات الزائدة وإبقاء wifiy.link فقط)')) return;
+  const el=document.getElementById('dnsAudit'); el.textContent='جارٍ الإصلاح...';
+  try{
+    const d=await api('/api/cloudflare/repair',{method:'POST',body:'{}'});
+    el.innerHTML=d.ok?'✅ تم الإصلاح — الإعدادات سليمة الآن':'⚠ '+d.issues.map(esc).join(' · ');
+    el.style.color=d.ok?'var(--ok)':'var(--warn)';
+    toast(d.ok?'تم إصلاح DNS ✅':'راجع النتائج','ok');
+  }catch(e){ el.textContent='خطأ: '+e.message; el.style.color='var(--danger)'; }
+}
+
+async function resetSerial(id){
+  if(!confirm('إعادة تعيين ربط السريال لهذا الراوتر؟')) return;
+  try{ await api('/api/routers/'+id+'/reset-serial',{method:'POST',body:'{}'}); toast('تمت إعادة التعيين ✅'); load(); }
+  catch(e){ toast('خطأ: '+e.message,'err'); }
+}
 
 function networkBody(prefix){
   const g=id=>document.getElementById(prefix+id).value.trim();

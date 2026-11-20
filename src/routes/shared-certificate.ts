@@ -19,7 +19,7 @@ router.post('/issue', async (req, res) => {
     return res.json({ ok: true, status: 'already-valid', certificate: before });
   }
   const result = await ensureSharedCertificate({ force });
-  res.json({ ok: true, status: result.action, certificate: await getSharedCertStatus() });
+  res.json({ ok: true, status: result.action, message: (result as any).message || (result as any).reason || null, certificate: await getSharedCertStatus() });
 });
 
 // Restore/import an existing valid certificate for the unified domain (no ACME call).
