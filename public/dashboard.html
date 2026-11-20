@@ -120,10 +120,19 @@
     </div>
 
     <div class="card">
-      <h2>🌐 النطاق الرئيسي (Main Domain)</h2>
+      <h2>🌐 النطاق والشهادة المشتركة</h2>
       <label>النطاق الموحّد</label>
       <input id="main_domain" value="wifiy.link" disabled />
       <div class="dns-hint" style="margin-top:8px">النطاق ثابت لكل الشبكات والروترات: <span>wifiy.link</span> — لا يمكن تغييره أو إضافة نطاق فرعي.</div>
+      <div style="height:1px;background:var(--border);margin:14px 0"></div>
+      <label>شهادة الخادم (واحدة للجميع)</label>
+      <div class="dns-hint" id="sharedCertStatus">جارٍ التحقق...</div>
+      <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+        <button class="btn primary" onclick="issueSharedCert(false)" id="sharedIssueBtn">🔐 إنشاء الشهادة المشتركة</button>
+        <button class="btn ghost" onclick="issueSharedCert(true)">🔄 تجديد</button>
+      </div>
+      <div class="msg" id="sharedMsg"></div>
+      <div class="dns-hint" style="margin-top:8px">تُنسَخ هذه الشهادة تلقائياً لكل الراوترات عبر الوكيل — لا تُصدر شهادة لكل راوتر على حدة.</div>
     </div>
   </div>
 
@@ -213,7 +222,7 @@ async function load(){
     customers=await api('/api/customers');
     routers=await api('/api/routers');
     document.getElementById('user').textContent='admin@alnooah.pro';
-    renderTree(); loadCertsCount(); loadCertsIntoTree();
+    renderTree(); loadCertsCount(); loadCertsIntoTree(); loadSharedCert();
   }catch(e){ if(e.message.includes('401')||e.message.includes('unauthorized')){localStorage.removeItem('token');location.href='/login';} }
 }
 
@@ -258,7 +267,6 @@ function renderTree(){
         <div class="tree-actions">
           <button class="btn sm ghost" onclick="genScript('${r.id}')">سكربت (تلقائي)</button>
           <button class="btn sm ghost" onclick="editNetwork('${r.id}')">✏️ تعديل</button>
-          <button class="btn sm primary" onclick="issueServerCert('${r.id}')">🔐 إنشاء شهادة الخادم</button>
           <button class="btn sm ghost" onclick="viewAgent('${r.id}')">وكيل</button>
           ${statusButton(r)}
           <button class="btn sm ${r.renewal_enabled?'ghost':'primary'}" onclick="toggleRenewal('${r.id}',${!r.renewal_enabled})">${r.renewal_enabled?'إيقاف التجديد':'تفعيل التجديد'}</button>
@@ -297,7 +305,6 @@ function renderTree(){
         <div class="tree-actions">
           <button class="btn sm ghost" onclick="genScript('${r.id}')">سكربت (تلقائي)</button>
           <button class="btn sm ghost" onclick="editNetwork('${r.id}')">✏️ تعديل</button>
-          <button class="btn sm primary" onclick="issueServerCert('${r.id}')">🔐 إنشاء شهادة الخادم</button>
           <button class="btn sm ghost" onclick="viewAgent('${r.id}')">وكيل</button>
           ${statusButton(r)}
           <button class="btn sm ${r.renewal_enabled?'ghost':'primary'}" onclick="toggleRenewal('${r.id}',${!r.renewal_enabled})">${r.renewal_enabled?'إيقاف التجديد':'تفعيل التجديد'}</button>
@@ -347,29 +354,47 @@ async function loadCertStatus(id){
   const el=document.getElementById('certstat-'+id);
   if(!el) return;
   try{
-    const s=await api('/api/routers/'+id+'/certificate');
+    const s=await api('/api/shared-certificate');
     if(s.valid){
-      el.innerHTML='🔐 شهادة صالحة — إصدار '+esc(s.version)+' · تنتهي '+new Date(s.notAfter).toLocaleDateString()+(s.source==='reused'?' (مُعاد استخدامها)':'');
+      el.innerHTML='🔐 شهادة مشتركة صالحة — إصدار '+esc(s.version)+' · تنتهي '+new Date(s.notAfter).toLocaleDateString();
       el.style.color='var(--ok)';
     }else{
-      el.innerHTML='⚠ لا توجد شهادة صالحة'+(s.lastError?' — '+esc(s.lastError):'')+' — اضغط «إنشاء شهادة الخادم»';
+      el.innerHTML='⚠ لا توجد شهادة مشتركة صالحة — أنشئها من بطاقة «النطاق والشهادة المشتركة»';
       el.style.color='var(--warn)';
     }
   }catch(e){ el.textContent='تعذّر التحقق من الشهادة'; el.style.color='var(--danger)'; }
 }
 
-async function issueServerCert(id, force){
-  if(force && !confirm('فرض إنشاء شهادة جديدة؟ (سيتم تجاهل الشهادة الحالية)')) return;
-  toast('جاري التحقق من الشهادة...');
+async function loadSharedCert(){
+  const el=document.getElementById('sharedCertStatus');
+  if(!el) return;
   try{
-    const r=await api('/api/routers/'+id+'/issue',{method:'POST',body:JSON.stringify({force:!!force})});
-    if(r.status==='already-valid'){ toast('الشهادة صالحة بالفعل — لم يتم إنشاء شهادة جديدة'); }
-    else if(r.status==='reused'){ toast('تم استخدام الشهادة الموجودة بنفس النطاق ✅'); }
-    else if(r.status==='busy'){ toast('النطاق مشغول بإصدار آخر — أعد المحاولة','err'); }
-    else { toast('تم بدء تجهيز الشهادة...'); }
-    setTimeout(()=>{ load(); }, 6000);
-  }catch(e){ toast('خطأ: '+e.message,'err'); loadCertStatus(id); }
+    const s=await api('/api/shared-certificate');
+    if(s.valid){
+      el.innerHTML='✅ صالحة — إصدار '+esc(s.version)+' · تنتهي '+new Date(s.notAfter).toLocaleDateString()+' · المصدر: '+esc(s.source||'-');
+      el.style.color='var(--ok)';
+    }else{
+      el.innerHTML='⚠ غير موجودة'+(s.lastError?' — '+esc(s.lastError):'')+' — اضغط «إنشاء الشهادة المشتركة»';
+      el.style.color='var(--warn)';
+    }
+  }catch(e){ el.textContent='تعذّر التحقق من الشهادة'; el.style.color='var(--danger)'; }
 }
+
+async function issueSharedCert(force){
+  if(force && !confirm('تجديد الشهادة المشتركة الآن؟ (سيتم إصدار شهادة واحدة للنطاق)')) return;
+  const m=document.getElementById('sharedMsg'); m.textContent='جارٍ العمل...'; m.className='msg';
+  const btn=document.getElementById('sharedIssueBtn'); if(btn) btn.disabled=true;
+  try{
+    const r=await api('/api/shared-certificate/issue',{method:'POST',body:JSON.stringify({force:!!force})});
+    if(r.status==='already-valid'){ m.textContent='الشهادة المشتركة صالحة بالفعل — لم يُصدر شيء'; m.className='msg ok'; toast('الشهادة صالحة بالفعل'); }
+    else if(r.status==='busy'){ m.textContent='النطاق مشغول — أعد المحاولة لاحقاً'; m.className='msg err'; toast('النطاق مشغول','err'); }
+    else { m.textContent='تم إصدار الشهادة المشتركة ✅ — ستُنسَخ لكل الراوترات تلقائياً'; m.className='msg ok'; toast('تم إصدار الشهادة المشتركة ✅'); }
+  }catch(e){ m.textContent='خطأ: '+e.message; m.className='msg err'; toast('خطأ: '+e.message,'err'); }
+  finally{ if(btn) btn.disabled=false; }
+  setTimeout(()=>{ loadSharedCert(); routers.forEach(r=>loadCertStatus(r.id)); }, 2000);
+}
+
+async function issueServerCert(id, force){ return issueSharedCert(force); }
 
 function networkBody(prefix){
   const g=id=>document.getElementById(prefix+id).value.trim();

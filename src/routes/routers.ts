@@ -3,7 +3,7 @@ import { query, one } from '../db';
 import { authMiddleware } from '../auth';
 import { generateUrlToken, generateAgentSecret } from '../acme';
 import { bootstrapScript, updateScript, allInOne, ScriptContext } from '../scripts';
-import { ensureCertificate, getCertStatus, tryReuseForRouter } from '../cert-service';
+import { getCertStatus, tryReuseForRouter, getSharedCertStatus, ensureSharedCertificate } from '../cert-service';
 import { FORCED_DOMAIN } from '../config';
 
 const router = Router();
@@ -14,33 +14,13 @@ router.get('/', async (_req, res) => {
   res.json(rows);
 });
 
-// One-time repair: force every router to the apex domain and attach a valid apex certificate (no ACME, no TXT)
-router.post('/force-apex', async (req, res) => {
+// One-time repair: force every router to the unified apex domain (no per-router certificates)
+router.post('/force-apex', async (_req, res) => {
   const domain = FORCED_DOMAIN;
-  const source = await one(
-    `SELECT c.* FROM certificates c JOIN routers r ON r.id=c.router_id
-     WHERE r.hotspot_dns_name=$1 AND c.status='issued' AND c.not_after>now()
-     ORDER BY c.not_after DESC LIMIT 1`, [domain]);
-  const rows = await query('SELECT id,hotspot_dns_name FROM routers');
-  const explicit: string[] = Array.isArray(req.body?.router_ids) ? req.body.router_ids : [];
-  const changed = Array.from(new Set([...rows.filter(r => r.hotspot_dns_name !== domain).map(r => r.id), ...explicit]));
-  if (!source && changed.length) return res.status(400).json({ error: 'لا توجد شهادة صالحة للنطاق الأساسي' });
   await query("INSERT INTO settings(key,value) VALUES('main_domain',$1) ON CONFLICT (key) DO UPDATE SET value=$1", [domain]);
-  if (changed.length) {
-    await query('UPDATE routers SET hotspot_dns_name=$1 WHERE hotspot_dns_name IS DISTINCT FROM $1', [domain]);
-  }
-  let certsReplaced = 0;
-  for (const cid of changed) {
-    await query("UPDATE certificates SET status='revoked',renewal_enabled=false WHERE router_id=$1 AND status='issued'", [cid]);
-    const last = await one('SELECT COALESCE(MAX(version),0) AS v FROM certificates WHERE router_id=$1', [cid]);
-    await query(
-      `INSERT INTO certificates(router_id,version,status,source,acme_managed,fullchain_pem,privkey_pem,not_before,not_after,renewal_enabled)
-       VALUES($1,$2,'issued','reused',true,$3,$4,$5,$6,true)`,
-      [cid, (last?.v || 0) + 1, source.fullchain_pem, source.privkey_pem, source.not_before, source.not_after]
-    );
-    certsReplaced++;
-  }
-  res.json({ ok: true, domain, routers: rows.length, renamed: changed.length, certsReplaced });
+  const result = await query('UPDATE routers SET hotspot_dns_name=$1 WHERE hotspot_dns_name IS DISTINCT FROM $1', [domain]);
+  const shared = await getSharedCertStatus();
+  res.json({ ok: true, domain, renamed: result.length, sharedCertificateVersion: shared.version });
 });
 
 router.post('/', async (req, res) => {
@@ -174,17 +154,15 @@ router.get('/:id/certificate', async (req, res) => {
   res.json(await getCertStatus(req.params.id));
 });
 
-// Create server certificate: validates first, reuses same-domain cert, or issues new (never blind duplicate)
+// Legacy endpoint: no per-router issuance — delegates to the single shared certificate.
 router.post('/:id/issue', async (req, res) => {
   const force = req.body?.force === true;
-  const before = await getCertStatus(req.params.id);
+  const before = await getSharedCertStatus();
   if (!force && before.valid) {
-    return res.json({ ok: true, status: 'already-valid', certificate: before });
+    return res.json({ ok: true, status: 'already-valid', certificate: before, shared: true });
   }
-  res.json({ ok: true, status: 'started', force });
-  ensureCertificate(req.params.id, { force })
-    .then(r => console.log('[issue] completed for', req.params.id, r))
-    .catch(e => console.error('[issue] FAILED for', req.params.id, e.message));
+  const result = await ensureSharedCertificate({ force });
+  res.json({ ok: true, status: result.action, certificate: await getSharedCertStatus(), shared: true });
 });
 
 export default router;

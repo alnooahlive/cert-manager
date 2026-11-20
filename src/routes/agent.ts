@@ -40,7 +40,7 @@ router.get('/:token/version.txt', async (req, res) => {
   const ctx = await resolve(req.params.token, serial);
   if (!ctx) return res.status(404).send('not found');
   if (!checkAuth(req, ctx.cred)) return res.status(403).send('forbidden');
-  const cert = await one('SELECT version FROM certificates WHERE router_id=$1 AND status=\'issued\' ORDER BY version DESC LIMIT 1', [ctx.cred.router_id]);
+  const cert = await one('SELECT version FROM shared_certificate WHERE id=1 AND status=\'issued\'');
   const ver = cert ? String(cert.version) : '0';
   res.type('text/plain').send(ver);
 });
@@ -50,7 +50,7 @@ router.get('/:token/fullchain.pem', async (req, res) => {
   const ctx = await resolve(req.params.token, serial);
   if (!ctx) return res.status(404).send('not found');
   if (!checkAuth(req, ctx.cred)) return res.status(403).send('forbidden');
-  const cert = await one('SELECT fullchain_pem FROM certificates WHERE router_id=$1 AND status=\'issued\' ORDER BY version DESC LIMIT 1', [ctx.cred.router_id]);
+  const cert = await one('SELECT fullchain_pem FROM shared_certificate WHERE id=1 AND status=\'issued\'');
   res.type('text/plain').send(cert?.fullchain_pem || '');
 });
 
@@ -59,7 +59,7 @@ router.get('/:token/privkey.pem', async (req, res) => {
   const ctx = await resolve(req.params.token, serial);
   if (!ctx) return res.status(404).send('not found');
   if (!checkAuth(req, ctx.cred)) return res.status(403).send('forbidden');
-  const cert = await one('SELECT privkey_pem FROM certificates WHERE router_id=$1 AND status=\'issued\' ORDER BY version DESC LIMIT 1', [ctx.cred.router_id]);
+  const cert = await one('SELECT privkey_pem FROM shared_certificate WHERE id=1 AND status=\'issued\'');
   res.type('text/plain').send(cert?.privkey_pem || '');
 });
 
@@ -138,7 +138,7 @@ router.get('/:token/ack', async (req, res) => {
   const step = String(req.query.step || '');
   await query('INSERT INTO acks(router_id,version,ok,step) VALUES($1,$2,$3,$4)', [ctx.cred.router_id, v, ok, step]);
   if (ok && step === 'bind') {
-    await query('UPDATE certificates SET last_applied_version=$1 WHERE router_id=$2', [v, ctx.cred.router_id]);
+    await query('UPDATE routers SET cert_applied_version=$1 WHERE id=$2', [v, ctx.cred.router_id]);
   }
   // verify serial on bind
   if (serial) {

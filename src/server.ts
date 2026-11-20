@@ -12,6 +12,7 @@ import routerRoutes from './routes/routers';
 import networkRoutes from './routes/networks';
 import customerRoutes from './routes/customers';
 import settingsRoutes from './routes/settings';
+import sharedCertRoutes from './routes/shared-certificate';
 import agentRoutes from './routes/agent';
 import cfRoutes from './routes/cloudflare';
 
@@ -38,6 +39,7 @@ app.use('/api/routers', routerRoutes);
 app.use('/api/networks', networkRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/shared-certificate', sharedCertRoutes);
 app.use('/api/cloudflare', cfRoutes);
 app.use('/agent/v1', agentRoutes);
 

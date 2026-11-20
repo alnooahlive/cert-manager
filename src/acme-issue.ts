@@ -2,6 +2,7 @@ import acme from 'acme-client';
 import crypto from 'crypto';
 import { query, one } from './db';
 import { cfRequest } from './cloudflare';
+import { FORCED_DOMAIN } from './config';
 
 const ACME_ENV = process.env.ACME_ENV || 'staging';
 const ACME_EMAIL = process.env.ACME_EMAIL || 'admin@alnooah.pro';
@@ -52,13 +53,14 @@ async function acquireDomainLock(domain: string, owner: string) {
      RETURNING domain`, [domain, owner, String(LOCK_MINUTES)]);
 }
 
-export async function issueCertificate(routerId: string, opts: { force?: boolean } = {}) {
-  const router = await one('SELECT * FROM routers WHERE id=$1', [routerId]);
-  if (!router) throw new Error('router not found');
-  const domain = router.hotspot_dns_name;
+/**
+ * Issue ONE shared certificate for the unified apex domain.
+ * Stores it in the singleton shared_certificate table. No router_id involved.
+ */
+export async function issueSharedCertificate(_opts: { force?: boolean } = {}) {
+  const domain = FORCED_DOMAIN;
   const owner = makeOwner();
 
-  // ---- domain lock: only one ACME challenge per domain at a time ----
   let lock = await acquireDomainLock(domain, owner);
   if (!lock) {
     for (let i = 0; i < 12; i++) {
@@ -67,25 +69,26 @@ export async function issueCertificate(routerId: string, opts: { force?: boolean
       if (lock) break;
     }
     if (!lock) {
-      console.log('[acme] domain busy, skipping:', domain);
-      await query('UPDATE routers SET last_issue_error=$1,last_issue_at=now() WHERE id=$2', ['النطاق مشغول بإصدار آخر، أعد المحاولة لاحقاً', routerId]);
+      const msg = 'النطاق مشغول بإصدار آخر، أعد المحاولة لاحقاً';
+      await query('UPDATE shared_certificate SET last_error=$1,updated_at=now() WHERE id=1', [msg]);
       return { version: 0, notAfter: new Date(), skipped: true, reason: 'domain busy' };
     }
   }
 
   try {
-    // ---- router lock: atomic, prevents worker + API double run ----
-    const routerLock = await one(
-      `UPDATE routers SET issuing_at=now() WHERE id=$1
-       AND (issuing_at IS NULL OR issuing_at < now() - ($2 || ' minutes')::interval)
-       RETURNING id`, [routerId, String(LOCK_MINUTES)]);
-    if (!routerLock) {
-      await query('UPDATE routers SET last_issue_error=$1,last_issue_at=now() WHERE id=$2', ['جارٍ إصدار شهادة لهذا الراوتر', routerId]);
-      return { version: 0, notAfter: new Date(), skipped: true, reason: 'router busy' };
+    const busy = await one(
+      `SELECT id FROM shared_certificate WHERE id=1
+       AND (issuing_at IS NULL OR issuing_at < now() - ($1 || ' minutes')::interval)
+       RETURNING id`, [String(LOCK_MINUTES)]);
+    if (!busy) {
+      const msg = 'جارٍ إصدار الشهادة المشتركة بالفعل';
+      await query('UPDATE shared_certificate SET last_error=$1,updated_at=now() WHERE id=1', [msg]);
+      return { version: 0, notAfter: new Date(), skipped: true, reason: 'shared cert busy' };
     }
+    await query('UPDATE shared_certificate SET issuing_at=now(),last_error=NULL,updated_at=now() WHERE id=1');
 
     try {
-      console.log('[acme] starting issuance for router', routerId, 'domain', domain);
+      console.log('[acme] issuing shared certificate for', domain);
       await cleanupStaleTxt(domain);
       const accountKey = await acme.crypto.createPrivateKey();
       const client = new acme.Client({ directoryUrl: dirUrl(), accountKey });
@@ -124,25 +127,30 @@ export async function issueCertificate(routerId: string, opts: { force?: boolean
       const notAfter = info.notAfter ? new Date(info.notAfter) : new Date(Date.now() + 89 * 24 * 3600 * 1000);
       const notBefore = info.notBefore ? new Date(info.notBefore) : new Date();
 
-      const last = await one('SELECT COALESCE(MAX(version),0) AS v FROM certificates WHERE router_id=$1', [routerId]);
-      const version = (last?.v || 0) + 1;
+      const last = await one('SELECT version FROM shared_certificate WHERE id=1');
+      const version = (last?.version || 0) + 1;
       await query(
-        `INSERT INTO certificates(router_id,version,status,source,acme_managed,fullchain_pem,privkey_pem,not_before,not_after)
-         VALUES($1,$2,'issued','acme',true,$3,$4,$5,$6)`,
-        [routerId, version, fullchain, privkey, notBefore, notAfter]
+        `UPDATE shared_certificate SET
+           version=$1,status='issued',source='acme',fullchain_pem=$2,privkey_pem=$3,
+           not_before=$4,not_after=$5,last_error=NULL,issuing_at=NULL,updated_at=now()
+         WHERE id=1`,
+        [version, fullchain, privkey, notBefore, notAfter]
       );
-      await query('UPDATE routers SET last_issue_error=NULL,last_issue_at=now() WHERE id=$1', [routerId]);
-      console.log('[acme] issued', routerId, 'version', version);
+      console.log('[acme] shared certificate issued, version', version);
       return { version, notAfter };
     } catch (e: any) {
       const msg = String(e?.message || e).slice(0, 500);
-      console.error('[acme] FAILED', routerId, msg);
-      await query('UPDATE routers SET last_issue_error=$1,last_issue_at=now() WHERE id=$2', [msg, routerId]);
+      console.error('[acme] shared issuance FAILED', msg);
+      await query('UPDATE shared_certificate SET last_error=$1,issuing_at=NULL,updated_at=now() WHERE id=1', [msg]);
       throw e;
-    } finally {
-      await query('UPDATE routers SET issuing_at=NULL WHERE id=$1', [routerId]);
     }
   } finally {
     await query('DELETE FROM issuance_locks WHERE domain=$1 AND owner=$2', [domain, owner]);
   }
+}
+
+// Backward-compatible alias: never issues per-router certificates.
+export async function issueCertificate(routerId: string, opts: { force?: boolean } = {}) {
+  console.log('[acme] per-router issuance disabled; using shared certificate', routerId);
+  return issueSharedCertificate(opts);
 }
