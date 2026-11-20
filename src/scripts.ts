@@ -108,6 +108,10 @@ export function updateScript(ctx: ScriptContext): string {
   lines.push(':delay 15s');
   lines.push('/certificate import file-name="hs-new-privkey.pem" passphrase=""');
   lines.push(':delay 15s');
+  lines.push(':do { /tool fetch url=($base . "/intermediate.pem") user=$fuser password=$fpass check-certificate=$cc http-header-field=("X-Router-Serial: " . $serial) dst-path="hs-new-intermediate.pem" } on-error={ :log warning "hs-cert: intermediate fetch failed" }');
+  lines.push(':delay 2s');
+  lines.push(':do { /certificate import file-name="hs-new-intermediate.pem" passphrase="" } on-error={ :log warning "hs-cert: intermediate import failed" }');
+  lines.push(':delay 5s');
   lines.push(':if ([:len [/certificate find where name="hs-new-fullchain.pem_0"]] = 0) do={');
   lines.push('    :log error "hs-cert: import failed"');
   lines.push('    :do { /tool fetch url=($ackb . "?v=0&ok=0&step=import") user=$fuser password=$fpass check-certificate=$cc output=none } on-error={ }');
@@ -125,12 +129,15 @@ export function updateScript(ctx: ScriptContext): string {
   lines.push(':delay 2s');
   lines.push(':do { /certificate set [find where name="hs-new-fullchain.pem_1"] name="hs-live-ca" } on-error={ }');
   lines.push(':delay 2s');
+  lines.push(':do { /certificate set [find where name="hs-new-intermediate.pem_0"] name="hs-live-int" } on-error={ }');
+  lines.push(':delay 2s');
   lines.push('/ip hotspot profile set [find where name=$profile] ssl-certificate="hs-live"');
   lines.push(':delay 2s');
   lines.push(':do { /ip service set www-ssl certificate=hs-live disabled=no } on-error={ :log warning "hs-cert: www-ssl certificate bind failed" }');
   lines.push(':delay 2s');
   lines.push(':do { /file remove [find where name="hs-new-fullchain.pem"] } on-error={ }');
   lines.push(':do { /file remove [find where name="hs-new-privkey.pem"] } on-error={ }');
+  lines.push(':do { /file remove [find where name="hs-new-intermediate.pem"] } on-error={ }');
   lines.push(':do { /tool fetch url=($ackb . "?v=1&ok=1&step=bind") user=$fuser password=$fpass check-certificate=$cc http-header-field=("X-Router-Serial: " . $serial) output=none } on-error={ :log warning "hs-cert: ack failed (non-fatal)" }');
   lines.push(':log info "hs-cert: done"');
   const raw = lines.join('\n');

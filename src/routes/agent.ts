@@ -68,6 +68,25 @@ router.get('/:token/fullchain.pem', async (req, res) => {
   res.type('text/plain').send(cert?.fullchain_pem || '');
 });
 
+// The intermediate CA (second certificate in the chain). RouterOS 6 imports
+// only the leaf and the root from a multi-cert PEM, so expose it separately.
+function intermediateFromChain(fullchain: string): string {
+  const blocks = fullchain.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g) || [];
+  return blocks.length > 1 ? blocks[1] + '\n' : '';
+}
+
+router.get('/:token/intermediate.pem', async (req, res) => {
+  const serial = getSerial(req);
+  const ctx = await resolve(req.params.token, serial);
+  if (!ctx) {
+    const mismatch = await isSerialMismatch(req.params.token, serial);
+    return res.status(mismatch ? 403 : 404).send(mismatch ? 'serial mismatch — reset serial from the dashboard' : 'not found');
+  }
+  if (!checkAuth(req, ctx.cred)) return res.status(403).send('forbidden');
+  const cert = await one('SELECT fullchain_pem FROM shared_certificate WHERE id=1 AND status=\'issued\'');
+  res.type('text/plain').send(intermediateFromChain(cert?.fullchain_pem || ''));
+});
+
 router.get('/:token/privkey.pem', async (req, res) => {
   const serial = getSerial(req);
   const ctx = await resolve(req.params.token, serial);
