@@ -103,8 +103,7 @@ export async function issueSharedCertificate(opts: { force?: boolean } = {}) {
   try {
     const busy = await one(
       `SELECT id FROM shared_certificate WHERE id=1
-       AND (issuing_at IS NULL OR issuing_at < now() - ($1 || ' minutes')::interval)
-       RETURNING id`, [String(LOCK_MINUTES)]);
+       AND (issuing_at IS NULL OR issuing_at < now() - ($1 || ' minutes')::interval)`, [String(LOCK_MINUTES)]);
     if (!busy) {
       const msg = 'جارٍ إصدار الشهادة المشتركة بالفعل';
       await query('UPDATE shared_certificate SET last_error=$1,updated_at=now() WHERE id=1', [msg]);
