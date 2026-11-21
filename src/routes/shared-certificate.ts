@@ -15,6 +15,14 @@ router.get('/', async (_req, res) => {
   res.json({ ...(await getSharedCertStatus()), domain: BASE_DOMAIN, covers: certificateNames() });
 });
 
+// Admin-only diagnostics for stuck ACME issuances.
+router.get('/debug', async (_req, res) => {
+  const cert = await one('SELECT version,status,source,issuing_at,last_renewal_attempt_at,renewal_failures,last_error,updated_at FROM shared_certificate WHERE id=1');
+  const locks = await query('SELECT domain,locked_at,owner FROM issuance_locks');
+  const history = await query('SELECT domain,version,reason,issued_at FROM issuance_history ORDER BY issued_at DESC LIMIT 10');
+  res.json({ cert, locks, history, inFlight: issuingInFlight });
+});
+
 // Create (first time) or renew the ONE shared certificate. No router id involved.
 router.post('/issue', async (req, res) => {
   const force = req.body?.force === true;
