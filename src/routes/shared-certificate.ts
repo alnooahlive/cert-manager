@@ -7,6 +7,10 @@ import { BASE_DOMAIN, certificateNames } from '../config';
 const router = Router();
 router.use(authMiddleware);
 
+// ACME issuance can take longer than the reverse-proxy timeout, so it runs in
+// the background and the caller polls GET /api/shared-certificate for the result.
+let issuingInFlight = false;
+
 router.get('/', async (_req, res) => {
   res.json({ ...(await getSharedCertStatus()), domain: BASE_DOMAIN, covers: certificateNames() });
 });
@@ -16,10 +20,23 @@ router.post('/issue', async (req, res) => {
   const force = req.body?.force === true;
   const before = await getSharedCertStatus();
   if (!force && before.valid) {
-    return res.json({ ok: true, status: 'already-valid', certificate: before });
+    return res.json({ ok: true, status: 'already-valid', certificate: before, domain: BASE_DOMAIN, covers: certificateNames() });
   }
-  const result = await ensureSharedCertificate({ force });
-  res.json({ ok: true, status: result.action, message: (result as any).message || (result as any).reason || null, domain: BASE_DOMAIN, covers: certificateNames(), certificate: await getSharedCertStatus() });
+  if (issuingInFlight) {
+    return res.json({ ok: true, status: 'queued', message: 'إصدار الشهادة جارٍ بالفعل — انتظر النتيجة', domain: BASE_DOMAIN, covers: certificateNames() });
+  }
+  issuingInFlight = true;
+  // Do not await: the HTTP response must return before ACME finishes.
+  void ensureSharedCertificate({ force }).catch(e => console.error('[shared-certificate] background issue failed', e?.message || e)).finally(() => {
+    issuingInFlight = false;
+  });
+  res.json({
+    ok: true,
+    status: 'queued',
+    message: 'بدأ إصدار الشهادة المشتركة — جارٍ المتابعة...',
+    domain: BASE_DOMAIN,
+    covers: certificateNames(),
+  });
 });
 
 // Restore/import an existing valid certificate for the unified domain (no ACME call).
