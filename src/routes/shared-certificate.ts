@@ -10,6 +10,7 @@ router.use(authMiddleware);
 // ACME issuance can take longer than the reverse-proxy timeout, so it runs in
 // the background and the caller polls GET /api/shared-certificate for the result.
 let issuingInFlight = false;
+let lastBackgroundError: string | null = null;
 
 router.get('/', async (_req, res) => {
   res.json({ ...(await getSharedCertStatus()), domain: BASE_DOMAIN, covers: certificateNames() });
@@ -20,7 +21,7 @@ router.get('/debug', async (_req, res) => {
   const cert = await one('SELECT version,status,source,issuing_at,last_renewal_attempt_at,renewal_failures,last_error,updated_at FROM shared_certificate WHERE id=1');
   const locks = await query('SELECT domain,locked_at,owner FROM issuance_locks');
   const history = await query('SELECT domain,version,reason,issued_at FROM issuance_history ORDER BY issued_at DESC LIMIT 10');
-  res.json({ cert, locks, history, inFlight: issuingInFlight });
+  res.json({ cert, locks, history, inFlight: issuingInFlight, lastBackgroundError });
 });
 
 // Create (first time) or renew the ONE shared certificate. No router id involved.
@@ -34,8 +35,12 @@ router.post('/issue', async (req, res) => {
     return res.json({ ok: true, status: 'queued', message: 'إصدار الشهادة جارٍ بالفعل — انتظر النتيجة', domain: BASE_DOMAIN, covers: certificateNames() });
   }
   issuingInFlight = true;
+  lastBackgroundError = null;
   // Do not await: the HTTP response must return before ACME finishes.
-  void ensureSharedCertificate({ force }).catch(e => console.error('[shared-certificate] background issue failed', e?.message || e)).finally(() => {
+  void ensureSharedCertificate({ force }).catch(e => {
+    lastBackgroundError = String(e?.message || e).slice(0, 500);
+    console.error('[shared-certificate] background issue failed', lastBackgroundError);
+  }).finally(() => {
     issuingInFlight = false;
   });
   res.json({
