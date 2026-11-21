@@ -3,7 +3,7 @@ import { query, one } from '../db';
 import { authMiddleware } from '../auth';
 import { generateUrlToken, generateAgentSecret } from '../acme';
 import { tryReuseForRouter } from '../cert-service';
-import { FORCED_DOMAIN } from '../config';
+import { BASE_DOMAIN, normalizeDomain } from '../config';
 
 const router = Router();
 router.use(authMiddleware);
@@ -14,6 +14,10 @@ router.post('/', async (req, res) => {
   const name = String(b.network_name || b.router_name || '').trim();
   if (!name) return res.status(400).json({ error: 'اسم الشبكة مطلوب' });
   if (!b.hotspot_local_ip) return res.status(400).json({ error: 'IP المحلي للموجه مطلوب' });
+
+  // Each network may use the apex or any subdomain under it.
+  const dnsName = normalizeDomain(b.hotspot_dns_name);
+  if (!dnsName) return res.status(400).json({ error: `الدومين يجب أن يكون ${BASE_DOMAIN} أو نطاقاً فرعياً تحته` });
 
   const owner = String(b.owner_name || '').trim();
   let customer: any = null;
@@ -30,7 +34,7 @@ router.post('/', async (req, res) => {
      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,'active',true) RETURNING *`,
     [customer?.id || null, owner || null, b.owner_phone || null, b.owner_email || null,
      name, b.ros_major || null, b.hotspot_profile || 'hsprof1', b.hotspot_local_ip,
-     FORCED_DOMAIN, b.subscription_months || 1, name, b.network_number || null]
+     dnsName, b.subscription_months || 1, name, b.network_number || null]
   );
   const r = rows[0];
 
@@ -63,6 +67,12 @@ router.patch('/:id', async (req, res) => {
   const existing = await one('SELECT * FROM routers WHERE id=$1', [req.params.id]);
   if (!existing) return res.status(404).json({ error: 'not found' });
 
+  // When a domain is supplied it must belong to the base zone; otherwise keep the current one.
+  const dnsName = b.hotspot_dns_name !== undefined
+    ? normalizeDomain(b.hotspot_dns_name)
+    : existing.hotspot_dns_name;
+  if (!dnsName) return res.status(400).json({ error: `الدومين يجب أن يكون ${BASE_DOMAIN} أو نطاقاً فرعياً تحته` });
+
   const owner = String(b.owner_name || '').trim();
   if (existing.customer_id) {
     await query(
@@ -87,7 +97,7 @@ router.patch('/:id', async (req, res) => {
      WHERE id=$11 RETURNING *`,
     [owner || null, b.owner_phone || null, b.owner_email || null,
      b.network_name || null, b.hotspot_profile || null, b.hotspot_local_ip || null,
-     FORCED_DOMAIN, b.subscription_months || null, b.network_name || null, b.network_number || null,
+     dnsName, b.subscription_months || null, b.network_name || null, b.network_number || null,
      req.params.id]
   );
   const customer = row?.customer_id ? await one('SELECT * FROM customers WHERE id=$1', [row.customer_id]) : null;

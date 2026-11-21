@@ -2,13 +2,13 @@ import { Router } from 'express';
 import { query, one } from '../db';
 import { authMiddleware } from '../auth';
 import { getSharedCertStatus, ensureSharedCertificate } from '../cert-service';
-import { FORCED_DOMAIN } from '../config';
+import { BASE_DOMAIN, certificateNames } from '../config';
 
 const router = Router();
 router.use(authMiddleware);
 
 router.get('/', async (_req, res) => {
-  res.json({ ...(await getSharedCertStatus()), domain: FORCED_DOMAIN });
+  res.json({ ...(await getSharedCertStatus()), domain: BASE_DOMAIN, covers: certificateNames() });
 });
 
 // Create (first time) or renew the ONE shared certificate. No router id involved.
@@ -19,7 +19,7 @@ router.post('/issue', async (req, res) => {
     return res.json({ ok: true, status: 'already-valid', certificate: before });
   }
   const result = await ensureSharedCertificate({ force });
-  res.json({ ok: true, status: result.action, message: (result as any).message || (result as any).reason || null, certificate: await getSharedCertStatus() });
+  res.json({ ok: true, status: result.action, message: (result as any).message || (result as any).reason || null, domain: BASE_DOMAIN, covers: certificateNames(), certificate: await getSharedCertStatus() });
 });
 
 // Restore/import an existing valid certificate for the unified domain (no ACME call).
@@ -41,7 +41,7 @@ router.post('/import', async (req, res) => {
      WHERE id=1`,
     [version, fullchain_pem, privkey_pem, not_before || null, not_after || null]
   );
-  res.json({ ok: true, status: 'imported', certificate: await getSharedCertStatus() });
+  res.json({ ok: true, status: 'imported', domain: BASE_DOMAIN, covers: certificateNames(), certificate: await getSharedCertStatus() });
 });
 
 export default router;

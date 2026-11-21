@@ -4,7 +4,7 @@ import { authMiddleware } from '../auth';
 import { generateUrlToken, generateAgentSecret } from '../acme';
 import { bootstrapScript, updateScript, allInOne, ScriptContext } from '../scripts';
 import { getCertStatus, tryReuseForRouter, getSharedCertStatus, ensureSharedCertificate } from '../cert-service';
-import { FORCED_DOMAIN } from '../config';
+import { BASE_DOMAIN, normalizeDomain } from '../config';
 
 const router = Router();
 router.use(authMiddleware);
@@ -14,9 +14,10 @@ router.get('/', async (_req, res) => {
   res.json(rows);
 });
 
-// One-time repair: force every router to the unified apex domain (no per-router certificates)
+// Optional bulk action: move every router back to the apex domain.
+// Normal creation/edit no longer forces this — subdomains are allowed.
 router.post('/force-apex', async (_req, res) => {
-  const domain = FORCED_DOMAIN;
+  const domain = BASE_DOMAIN;
   await query("INSERT INTO settings(key,value) VALUES('main_domain',$1) ON CONFLICT (key) DO UPDATE SET value=$1", [domain]);
   const result = await query('UPDATE routers SET hotspot_dns_name=$1 WHERE hotspot_dns_name IS DISTINCT FROM $1', [domain]);
   const shared = await getSharedCertStatus();
@@ -27,8 +28,10 @@ router.post('/', async (req, res) => {
   const b = req.body || {};
   if (!b.network_name && !b.router_name) return res.status(400).json({ error: 'network_name required' });
   if (!b.hotspot_local_ip) return res.status(400).json({ error: 'hotspot_local_ip required' });
-  // unified apex domain: any subdomain input is ignored
-  b.hotspot_dns_name = FORCED_DOMAIN;
+  // Apex or any subdomain under the base zone; default to apex.
+  const dnsName = normalizeDomain(b.hotspot_dns_name);
+  if (!dnsName) return res.status(400).json({ error: `hotspot_dns_name must be ${BASE_DOMAIN} or a subdomain under it` });
+  b.hotspot_dns_name = dnsName;
   const rows = await query(
     `INSERT INTO routers(customer_id,customer_name,phone,email,router_name,ros_major,hotspot_profile,hotspot_local_ip,hotspot_dns_name,subscription_months,network_name,network_number)
      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
@@ -50,7 +53,11 @@ router.post('/', async (req, res) => {
 
 router.patch('/:id', async (req, res) => {
   const b = req.body || {};
-  b.hotspot_dns_name = FORCED_DOMAIN;
+  if (b.hotspot_dns_name !== undefined) {
+    const dnsName = normalizeDomain(b.hotspot_dns_name);
+    if (!dnsName) return res.status(400).json({ error: `hotspot_dns_name must be ${BASE_DOMAIN} or a subdomain under it` });
+    b.hotspot_dns_name = dnsName;
+  }
   const row = await one(
     `UPDATE routers SET
        customer_id=COALESCE($1,customer_id),

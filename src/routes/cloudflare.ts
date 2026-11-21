@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { authMiddleware } from '../auth';
 import { checkDns, ensureARecord, auditDns, repairDns } from '../cloudflare';
-import { FORCED_DOMAIN } from '../config';
+import { BASE_DOMAIN, ORIGIN_IP } from '../config';
 
 const router = Router();
 router.use(authMiddleware);
@@ -24,15 +24,15 @@ router.post('/ensure-a', async (req, res) => {
 
 router.get('/audit', async (req, res) => {
   try {
-    const ip = String(req.query.ip || process.env.ORIGIN_IP || '');
-    res.json(await auditDns(FORCED_DOMAIN, ip || undefined));
+    const ip = String(req.query.ip || ORIGIN_IP);
+    res.json(await auditDns(BASE_DOMAIN, ip || undefined));
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
 router.post('/repair', async (req, res) => {
   try {
-    const ip = String(req.body?.ip || process.env.ORIGIN_IP || '');
-    res.json(await repairDns(FORCED_DOMAIN, ip || undefined));
+    const ip = String(req.body?.ip || ORIGIN_IP);
+    res.json(await repairDns(BASE_DOMAIN, ip || undefined));
   } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 

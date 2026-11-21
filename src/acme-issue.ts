@@ -2,7 +2,7 @@ import acme from 'acme-client';
 import crypto from 'crypto';
 import { query, one } from './db';
 import { cfRequest } from './cloudflare';
-import { FORCED_DOMAIN } from './config';
+import { BASE_DOMAIN } from './config';
 
 const ACME_ENV = process.env.ACME_ENV || 'staging';
 const ACME_EMAIL = process.env.ACME_EMAIL || 'admin@alnooah.pro';
@@ -77,11 +77,13 @@ async function acquireDomainLock(domain: string, owner: string) {
 }
 
 /**
- * Issue ONE shared certificate for the unified apex domain.
+ * Issue ONE shared certificate for the base zone.
+ * The SAN list always contains both the apex and the wildcard so every
+ * network may use `wifiy.link` or any `*.wifiy.link` name with the same cert.
  * Stores it in the singleton shared_certificate table. No router_id involved.
  */
 export async function issueSharedCertificate(opts: { force?: boolean } = {}) {
-  const domain = FORCED_DOMAIN;
+  const domain = BASE_DOMAIN;
   const owner = makeOwner();
 
   let lock = await acquireDomainLock(domain, owner);
@@ -118,12 +120,25 @@ export async function issueSharedCertificate(opts: { force?: boolean } = {}) {
     await query('UPDATE shared_certificate SET issuing_at=now(),last_renewal_attempt_at=now(),last_error=NULL,updated_at=now() WHERE id=1');
 
     try {
-      console.log('[acme] issuing shared certificate for', domain);
+      const altNames = [domain, `*.${domain}`];
+      console.log('[acme] issuing shared certificate for', domain, 'SAN:', altNames.join(', '));
       await cleanupStaleTxt(domain);
       const accountKey = await acme.crypto.createPrivateKey();
       const client = new acme.Client({ directoryUrl: dirUrl(), accountKey });
-      const [key, csr] = await acme.crypto.createCsr({ commonName: domain, altNames: [domain] });
-      const txtRecords: { id: string; name: string }[] = [];
+      const [key, csr] = await acme.crypto.createCsr({ commonName: domain, altNames });
+
+      // Apex + wildcard create two separate DNS-01 challenges with the SAME
+      // TXT name but different values. Track each record by its challenge so
+      // removing one never deletes the other one still being validated.
+      const txtByChallenge = new Map<string, { id: string; name: string }>();
+      const challengeKey = (authz: any, challenge: any, keyAuthorization: string) =>
+        `${authz?.identifier?.value || domain}|${challenge?.type || 'dns-01'}|${challenge?.token || keyAuthorization}`;
+      const removeAllTxt = async () => {
+        for (const rec of txtByChallenge.values()) {
+          try { await deleteTxtRecord(rec.id); } catch {}
+        }
+        txtByChallenge.clear();
+      };
 
       let certPem: any;
       try {
@@ -133,21 +148,24 @@ export async function issueSharedCertificate(opts: { force?: boolean } = {}) {
           termsOfServiceAgreed: true,
           skipChallengeVerification: true,
           challengePriority: ['dns-01'],
-          challengeCreateFn: async (_authz: any, _challenge: any, keyAuthorization: string) => {
+          challengeCreateFn: async (authz: any, challenge: any, keyAuthorization: string) => {
             const name = `_acme-challenge.${domain}`;
             const id = await createTxtRecord(name, keyAuthorization);
-            txtRecords.push({ id, name });
-            console.log('[acme] TXT created:', name);
+            txtByChallenge.set(challengeKey(authz, challenge, keyAuthorization), { id, name });
+            console.log('[acme] TXT created:', name, 'for', authz?.identifier?.value || domain);
             await new Promise(res => setTimeout(res, 8000));
           },
-          challengeRemoveFn: async () => {
-            for (const t of txtRecords) { try { await deleteTxtRecord(t.id); } catch {} }
-            txtRecords.length = 0;
+          challengeRemoveFn: async (authz: any, challenge: any, keyAuthorization: string) => {
+            const key = challengeKey(authz, challenge, keyAuthorization);
+            const rec = txtByChallenge.get(key);
+            if (!rec) return; // already cleaned up
+            try { await deleteTxtRecord(rec.id); } catch {}
+            txtByChallenge.delete(key);
+            console.log('[acme] TXT removed:', rec.name);
           },
         });
       } catch (e: any) {
-        for (const t of txtRecords) { try { await deleteTxtRecord(t.id); } catch {} }
-        txtRecords.length = 0;
+        await removeAllTxt();
         throw e;
       }
 

@@ -35,48 +35,70 @@ async function allRecords() {
   return r.result || [];
 }
 
-// Detect configuration drift: stray subdomains, leftover TXT, wrong apex IP/proxy.
+// The two records required for apex + subdomain use:
+//   wifiy.link     -> origin (proxied)
+//   *.wifiy.link   -> origin (proxied)
+function expectedNames(domain: string): string[] {
+  return [domain, `*.${domain}`];
+}
+
+// Detect configuration drift: stray A records, leftover TXT, wrong IP/proxy.
 export async function auditDns(domain: string, expectedIp?: string) {
   const recs = await allRecords();
-  const apex = recs.filter((r: any) => r.name === domain && r.type === 'A');
+  const names = expectedNames(domain);
   const issues: string[] = [];
-  if (apex.length !== 1) issues.push(`سجل A للنطاق ${domain}: ${apex.length} بدل واحد`);
-  else {
-    if (expectedIp && apex[0].content !== expectedIp) issues.push(`عنوان IP الحالي ${apex[0].content} بدل ${expectedIp}`);
-    if (apex[0].proxied !== true) issues.push('السجل غير محمي بوكيل Cloudflare');
+
+  for (const name of names) {
+    const matches = recs.filter((r: any) => r.name === name && r.type === 'A');
+    if (matches.length !== 1) {
+      issues.push(`سجل A للنطاق ${name}: ${matches.length} بدل واحد`);
+      continue;
+    }
+    if (expectedIp && matches[0].content !== expectedIp) {
+      issues.push(`عنوان IP الحالي لـ ${name} هو ${matches[0].content} بدل ${expectedIp}`);
+    }
+    if (matches[0].proxied !== true) issues.push(`سجل ${name} غير محمي بوكيل Cloudflare`);
   }
-  const stray = recs.filter((r: any) => r.type === 'A' && r.name !== domain);
+
+  const stray = recs.filter((r: any) => r.type === 'A' && !names.includes(r.name));
   if (stray.length) issues.push(`سجلات A فرعية زائدة: ${stray.map((r: any) => r.name).join(', ')}`);
   const txt = recs.filter((r: any) => r.type === 'TXT' && String(r.name).includes('_acme-challenge'));
   if (txt.length) issues.push(`سجلات TXT عالقة: ${txt.length}`);
   return { ok: issues.length === 0, issues, totalRecords: recs.length };
 }
 
-// Restore the expected single-domain DNS layout without touching zone settings.
+// Restore the expected apex + wildcard DNS layout without touching zone settings.
 export async function repairDns(domain: string, expectedIp?: string) {
   const recs = await allRecords();
+  const names = expectedNames(domain);
   const apex = recs.filter((r: any) => r.name === domain && r.type === 'A');
-  const ip = expectedIp || apex[0]?.content;
+  const wildcard = recs.filter((r: any) => r.name === `*.${domain}` && r.type === 'A');
+  const ip = expectedIp || apex[0]?.content || wildcard[0]?.content;
   if (!ip) throw new Error('لا يوجد عنوان IP معروف — أرسل ip صريحاً');
 
   for (const r of recs) {
-    const isStrayA = r.type === 'A' && r.name !== domain;
+    const keepId = r.name === domain ? apex[0]?.id : wildcard[0]?.id;
+    const isStrayA = r.type === 'A' && !names.includes(r.name);
     const isStaleTxt = r.type === 'TXT' && String(r.name).includes('_acme-challenge');
-    const isDuplicateApex = r.type === 'A' && r.name === domain && r.id !== apex[0]?.id;
-    if (isStrayA || isStaleTxt || isDuplicateApex) {
+    const isDuplicate = r.type === 'A' && names.includes(r.name) && r.id !== keepId;
+    if (isStrayA || isStaleTxt || isDuplicate) {
       await cfRequest(`/zones/${CF_ZONE}/dns_records/${r.id}`, { method: 'DELETE' });
     }
   }
-  if (apex.length === 0) {
-    await cfRequest(`/zones/${CF_ZONE}/dns_records`, {
-      method: 'POST',
-      body: JSON.stringify({ type: 'A', name: domain, content: ip, proxied: true, ttl: 120 }),
-    });
-  } else if (apex[0].content !== ip || apex[0].proxied !== true) {
-    await cfRequest(`/zones/${CF_ZONE}/dns_records/${apex[0].id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ type: 'A', name: domain, content: ip, proxied: true, ttl: 120 }),
-    });
+
+  for (const name of names) {
+    const list = name === domain ? apex : wildcard;
+    if (list.length === 0) {
+      await cfRequest(`/zones/${CF_ZONE}/dns_records`, {
+        method: 'POST',
+        body: JSON.stringify({ type: 'A', name, content: ip, proxied: true, ttl: 120 }),
+      });
+    } else if (list[0].content !== ip || list[0].proxied !== true) {
+      await cfRequest(`/zones/${CF_ZONE}/dns_records/${list[0].id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ type: 'A', name, content: ip, proxied: true, ttl: 120 }),
+      });
+    }
   }
   return auditDns(domain, ip);
 }

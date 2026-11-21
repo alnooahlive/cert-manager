@@ -1,6 +1,6 @@
 import { query, one } from './db';
 import { issueSharedCertificate } from './acme-issue';
-import { FORCED_DOMAIN } from './config';
+import { BASE_DOMAIN, certificateNames } from './config';
 
 export interface CertStatus {
   exists: boolean;
@@ -8,6 +8,7 @@ export interface CertStatus {
   version: number | null;
   notAfter: string | null;
   domain: string | null;
+  covers: string[];
   source: string | null;
   reason?: string;
   lastError?: string | null;
@@ -20,7 +21,8 @@ function mapStatus(s: any): CertStatus {
     valid: !!s && s.status === 'issued' && !!s.not_after && new Date(s.not_after) > new Date(),
     version: s?.version ?? null,
     notAfter: s?.not_after ?? null,
-    domain: FORCED_DOMAIN,
+    domain: BASE_DOMAIN,
+    covers: certificateNames(),
     source: s?.source ?? null,
     reason: s?.status === 'issued' ? undefined : 'لا توجد شهادة مشتركة صالحة',
     lastError: s?.last_error ?? null,
